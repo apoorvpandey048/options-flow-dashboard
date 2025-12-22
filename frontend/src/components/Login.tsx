@@ -26,7 +26,7 @@ const Login: React.FC = () => {
 
       localStorage.setItem('token', response.token);
       localStorage.setItem('username', response.username);
-      navigate('/monitor');
+      navigate('/');
     } catch (err) {
       // Proper error handling with type checking
       if (err && typeof err === 'object' && 'response' in err) {
