@@ -1,0 +1,20 @@
+# Sensitive data
+backend/users.json
+backend/*.json
+!backend/.env.example
+
+node_modules/
+build/
+dist/
+*.pyc
+__pycache__/
+venv/
+.env
+.DS_Store
+*.log
+.vscode/
+.idea/
+coverage/
+*.swp
+*.swo
+.pytest_cache/
