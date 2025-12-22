@@ -270,4 +270,6 @@ if __name__ == '__main__':
     # Run the Flask app with SocketIO
     # Force debug=False in production for security
     debug_mode = Config.DEBUG if Config.FLASK_ENV != 'production' else False
-    socketio.run(app, debug=debug_mode, host='0.0.0.0', port=5000)
+    # Use PORT environment variable for deployment platforms (Render, Heroku, etc.)
+    port = int(os.environ.get('PORT', 5000))
+    socketio.run(app, debug=debug_mode, host='0.0.0.0', port=port)
