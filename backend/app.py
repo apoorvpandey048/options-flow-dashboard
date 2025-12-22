@@ -272,4 +272,6 @@ if __name__ == '__main__':
     debug_mode = Config.DEBUG if Config.FLASK_ENV != 'production' else False
     # Use PORT environment variable for deployment platforms (Render, Heroku, etc.)
     port = int(os.environ.get('PORT', 5000))
-    socketio.run(app, debug=debug_mode, host='0.0.0.0', port=port)
+    # Allow Werkzeug in production (for deployment platforms like Render)
+    # Note: In real production, use gunicorn or another WSGI server
+    socketio.run(app, debug=debug_mode, host='0.0.0.0', port=port, allow_unsafe_werkzeug=True)
