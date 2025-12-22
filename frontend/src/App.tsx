@@ -42,8 +42,31 @@ function App() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
 
   useEffect(() => {
+    // Check auth on mount
     const token = localStorage.getItem('token');
     setIsAuthenticated(!!token);
+
+    // Listen for storage changes (from login/logout in other tabs or same window)
+    const handleStorageChange = () => {
+      const token = localStorage.getItem('token');
+      setIsAuthenticated(!!token);
+    };
+
+    // Check auth periodically to catch when token is set
+    const interval = setInterval(() => {
+      const token = localStorage.getItem('token');
+      setIsAuthenticated(!!token);
+    }, 100);
+
+    window.addEventListener('storage', handleStorageChange);
+
+    // Clear interval after 2 seconds (enough time for login redirect)
+    setTimeout(() => clearInterval(interval), 2000);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('storage', handleStorageChange);
+    };
   }, []);
 
   const handleLogout = () => {
