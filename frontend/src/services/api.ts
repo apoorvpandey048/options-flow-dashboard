@@ -59,35 +59,51 @@ class ApiService {
 
   async getMonitorData(symbol: string, timeframe: string = '5min'): Promise<MonitorData> {
     const response = await axios.get(`${API_BASE_URL}/api/monitor/${symbol}`, {
-      params: { timeframe }
+      params: { timeframe },
+      headers: this.getAuthHeader(),
+      timeout: 5000
     });
     return response.data;
   }
 
   async getAllTimeframes(symbol: string) {
-    const response = await axios.get(`${API_BASE_URL}/api/monitor/${symbol}/all-timeframes`);
+    const response = await axios.get(`${API_BASE_URL}/api/monitor/${symbol}/all-timeframes`, {
+      headers: this.getAuthHeader(),
+      timeout: 5000
+    });
     return response.data;
   }
 
   async getSummary(timeframe: string = '5min') {
     const response = await axios.get(`${API_BASE_URL}/api/monitor/summary`, {
-      params: { timeframe }
+      params: { timeframe },
+      headers: this.getAuthHeader(),
+      timeout: 5000
     });
     return response.data;
   }
 
   async getStrikeAnalysis(symbol: string) {
-    const response = await axios.get(`${API_BASE_URL}/api/monitor/${symbol}/strikes`);
+    const response = await axios.get(`${API_BASE_URL}/api/monitor/${symbol}/strikes`, {
+      headers: this.getAuthHeader(),
+      timeout: 5000
+    });
     return response.data;
   }
 
   async runBacktest(params: Partial<BacktestParams>): Promise<BacktestResult> {
-    const response = await axios.post(`${API_BASE_URL}/api/backtest/run`, params);
+    const response = await axios.post(`${API_BASE_URL}/api/backtest/run`, params, {
+      headers: this.getAuthHeader(),
+      timeout: 30000
+    });
     return response.data;
   }
 
   async compareStrategies(params: Partial<BacktestParams>): Promise<ComparisonResult> {
-    const response = await axios.post(`${API_BASE_URL}/api/backtest/compare`, params);
+    const response = await axios.post(`${API_BASE_URL}/api/backtest/compare`, params, {
+      headers: this.getAuthHeader(),
+      timeout: 30000
+    });
     return response.data;
   }
 

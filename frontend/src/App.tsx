@@ -48,7 +48,9 @@ function App() {
 
   const handleLogout = () => {
     localStorage.removeItem('token');
+    localStorage.removeItem('username');
     setIsAuthenticated(false);
+    // Force reload to clear all state
     window.location.href = '/login';
   };
 
