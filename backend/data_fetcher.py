@@ -41,12 +41,20 @@ class DataFetcher:
             print(f"Error fetching options chain for {symbol}: {e}")
             return {'strikes': [], 'current_price': 100.0, 'expiration': None}
     
-    def get_options_flow_data(self, symbol: str, timeframe: str = '5min') -> dict:
+    def get_options_flow_data(self, symbol: str, timeframe: str = '5min', replay_date: str = None, replay_time: str = None) -> dict:
         """
         Get options flow data for specified timeframe
         Returns put/call ratios and volume data
         Thread-safe with proper cache management
         """
+        # Don't cache historical replay data - need fresh data each time
+        if replay_date or replay_time:
+            try:
+                return self.provider.get_options_flow_data(symbol, timeframe, replay_date, replay_time)
+            except Exception as e:
+                print(f"Error fetching flow data for {symbol}: {e}")
+                return self._get_default_data(symbol, timeframe)
+        
         cache_key = f"{symbol}_{timeframe}"
         
         # Thread-safe cache check
@@ -64,7 +72,7 @@ class DataFetcher:
                 self._clear_old_cache_entries(force=True)
         
         try:
-            data = self.provider.get_options_flow_data(symbol, timeframe)
+            data = self.provider.get_options_flow_data(symbol, timeframe, replay_date, replay_time)
             
             # Thread-safe cache update
             with self._cache_lock:
@@ -74,21 +82,24 @@ class DataFetcher:
             
         except Exception as e:
             print(f"Error fetching flow data for {symbol}: {e}")
-            # Return safe default
-            return {
-                'symbol': symbol,
-                'timeframe': timeframe,
-                'timestamp': datetime.now().isoformat(),
-                'call_buy': 1000,
-                'call_sell': 1000,
-                'put_buy': 1000,
-                'put_sell': 1000,
-                'call_ratio': 1.0,
-                'put_ratio': 1.0,
-                'put_call_ratio': 1.0,
-                'strikes': [],
-                'current_price': 100.0
-            }
+            return self._get_default_data(symbol, timeframe)
+    
+    def _get_default_data(self, symbol: str, timeframe: str) -> dict:
+        """Return safe default data"""
+        return {
+            'symbol': symbol,
+            'timeframe': timeframe,
+            'timestamp': datetime.now().isoformat(),
+            'call_buy': 1000,
+            'call_sell': 1000,
+            'put_buy': 1000,
+            'put_sell': 1000,
+            'call_ratio': 1.0,
+            'put_ratio': 1.0,
+            'put_call_ratio': 1.0,
+            'strikes': [],
+            'current_price': 100.0
+        }
     
     def _clear_old_cache_entries(self, force=False):
         """Clear cache entries older than timeout to prevent memory leak"""

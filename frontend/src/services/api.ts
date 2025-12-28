@@ -64,9 +64,13 @@ class ApiService {
     return response.data;
   }
 
-  async getMonitorData(symbol: string, timeframe: string = '5min'): Promise<MonitorData> {
+  async getMonitorData(symbol: string, timeframe: string = '5min', date?: string, time?: string): Promise<MonitorData> {
+    const params: any = { timeframe };
+    if (date) params.date = date;
+    if (time) params.time = time;
+    
     const response = await axios.get(`${API_BASE_URL}/api/monitor/${symbol}`, {
-      params: { timeframe },
+      params,
       headers: this.getAuthHeader(),
       timeout: 5000
     });

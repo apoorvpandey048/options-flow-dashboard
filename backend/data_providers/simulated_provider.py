@@ -68,7 +68,7 @@ class SimulatedDataProvider(BaseDataProvider):
             'expiration': expiration_date or (datetime.now() + timedelta(days=7)).strftime('%Y-%m-%d')
         }
     
-    def get_options_flow_data(self, symbol: str, timeframe: str = '5min') -> Dict:
+    def get_options_flow_data(self, symbol: str, timeframe: str = '5min', replay_date: str = None, replay_time: str = None) -> Dict:
         """Generate simulated options flow data"""
         # Timeframe multipliers
         multipliers = {
@@ -79,7 +79,22 @@ class SimulatedDataProvider(BaseDataProvider):
         }
         
         mult = multipliers.get(timeframe, 1.0)
-        market_bias = np.random.uniform(-0.3, 0.3)
+        
+        # Use replay time to generate time-based progression
+        if replay_time:
+            hours, minutes = map(int, replay_time.split(':'))
+            time_minutes = hours * 60 + minutes
+            market_open = 9 * 60 + 30  # 09:30
+            time_factor = (time_minutes - market_open) / 390  # 0 to 1 through trading day
+            
+            # Volume increases through the day
+            volume_factor = 0.5 + time_factor * 1.5
+            # Add some noise based on time to make each minute unique
+            np.random.seed(time_minutes)
+            market_bias = np.random.uniform(-0.3, 0.3)
+            mult *= volume_factor
+        else:
+            market_bias = np.random.uniform(-0.3, 0.3)
         
         # Ensure minimum volumes to avoid division by zero
         call_buy = max(1000, int(np.random.uniform(10000, 30000) * mult * (1 + market_bias)))

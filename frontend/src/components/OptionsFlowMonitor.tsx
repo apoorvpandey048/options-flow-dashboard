@@ -24,14 +24,19 @@ const OptionsFlowMonitor: React.FC = () => {
   const fetchData = useCallback(async () => {
     try {
       setError(null);
-      const data = await apiService.getMonitorData(selectedSymbol, selectedTimeframe);
+      const data = await apiService.getMonitorData(
+        selectedSymbol, 
+        selectedTimeframe,
+        dataMode === 'historical' ? selectedDate || undefined : undefined,
+        dataMode === 'historical' ? replayTime : undefined
+      );
       setMonitorData(data);
       setLastUpdate(new Date());
     } catch (error) {
       console.error('Error fetching monitor data:', error);
       setError('Failed to fetch data. Retrying...');
     }
-  }, [selectedSymbol, selectedTimeframe]);
+  }, [selectedSymbol, selectedTimeframe, dataMode, selectedDate, replayTime]);
 
   // Initial fetch
   useEffect(() => {

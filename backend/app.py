@@ -106,6 +106,8 @@ def get_symbols():
 def get_monitor_data(symbol):
     """Get options flow data for a specific symbol"""
     timeframe = request.args.get('timeframe', '5min')
+    replay_date = request.args.get('date')  # Format: YYYY-MM-DD
+    replay_time = request.args.get('time')  # Format: HH:MM
     
     if symbol not in Config.SYMBOLS:
         return jsonify({'error': 'Invalid symbol'}), 400
@@ -113,7 +115,7 @@ def get_monitor_data(symbol):
     if timeframe not in Config.TIMEFRAMES:
         return jsonify({'error': 'Invalid timeframe'}), 400
     
-    data = options_monitor.get_monitor_data(symbol, timeframe)
+    data = options_monitor.get_monitor_data(symbol, timeframe, replay_date, replay_time)
     return jsonify(data)
 
 

@@ -14,11 +14,11 @@ class OptionsFlowMonitor:
         self.symbols = Config.SYMBOLS
         self.timeframes = Config.TIMEFRAMES
     
-    def get_monitor_data(self, symbol, timeframe='5min'):
+    def get_monitor_data(self, symbol, timeframe='5min', replay_date=None, replay_time=None):
         """
         Get complete monitor data for a symbol and timeframe
         """
-        flow_data = self.data_fetcher.get_options_flow_data(symbol, timeframe)
+        flow_data = self.data_fetcher.get_options_flow_data(symbol, timeframe, replay_date, replay_time)
         
         return {
             'symbol': symbol,
