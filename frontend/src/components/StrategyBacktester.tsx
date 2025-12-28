@@ -8,7 +8,7 @@ const StrategyBacktester: React.FC = () => {
   const [progress, setProgress] = useState(0);
   const [results, setResults] = useState<ComparisonResult | null>(null);
   const [dataMode, setDataMode] = useState<'live' | 'historical'>('live');
-  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [selectedDate, setSelectedDate] = useState<string>('');
   const [replayTime, setReplayTime] = useState<string>('09:30');
   const [isPlaying, setIsPlaying] = useState(false);
   const [playbackSpeed, setPlaybackSpeed] = useState<number>(1000);
@@ -42,7 +42,7 @@ const StrategyBacktester: React.FC = () => {
     try {
       // Add selectedDate to params if available
       const paramsWithDate = selectedDate 
-        ? { ...params, date: selectedDate.toISOString().split('T')[0] }
+        ? { ...params, date: selectedDate }
         : params;
       
       const result = await apiService.compareStrategies(paramsWithDate);
@@ -77,7 +77,7 @@ const StrategyBacktester: React.FC = () => {
           <button
             onClick={() => {
               setDataMode('live');
-              setSelectedDate(null);
+              setSelectedDate('');
             }}
             className={`px-4 py-2 text-sm font-bold transition-colors rounded ${
               dataMode === 'live'
