@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 from datetime import datetime
 from config import Config
+from historical_scenario_generator import historical_generator
 
 
 class StrategyBacktester:
@@ -26,7 +27,7 @@ class StrategyBacktester:
             'use_multi_timeframe': True
         }
     
-    def run_backtest(self, params=None):
+    def run_backtest(self, params=None, date=None):
         """Run a single backtest with given parameters"""
         if params is None:
             params = self.default_params.copy()
@@ -39,7 +40,7 @@ class StrategyBacktester:
         # Validate parameters
         self._validate_params(params)
         
-        result = self._execute_backtest(params, 'puts')
+        result = self._execute_backtest(params, 'puts', date=date)
         return result
     
     def _validate_params(self, params):
@@ -70,7 +71,7 @@ class StrategyBacktester:
         if errors:
             raise ValueError("Invalid parameters: " + "; ".join(errors))
     
-    def compare_strategies(self, params=None):
+    def compare_strategies(self, params=None, date=None):
         """Compare multiple strategies: advanced puts, basic puts, advanced calls"""
         if params is None:
             params = self.default_params.copy()
@@ -83,7 +84,7 @@ class StrategyBacktester:
         self._validate_params(params)
         
         # Run advanced puts strategy
-        advanced_puts = self._execute_backtest(params, 'puts')
+        advanced_puts = self._execute_backtest(params, 'puts', date=date)
         
         # Run basic puts (no filters)
         basic_params = params.copy()
@@ -92,10 +93,10 @@ class StrategyBacktester:
             'use_iv_filter': False,
             'use_multi_timeframe': False
         })
-        basic_puts = self._execute_backtest(basic_params, 'puts')
+        basic_puts = self._execute_backtest(basic_params, 'puts', date=date)
         
         # Run advanced calls (inverse signals)
-        advanced_calls = self._execute_backtest(params, 'calls')
+        advanced_calls = self._execute_backtest(params, 'calls', date=date)
         
         return {
             'advanced_puts': advanced_puts,
@@ -104,7 +105,7 @@ class StrategyBacktester:
             'comparison': self._calculate_comparison(advanced_puts, basic_puts, advanced_calls)
         }
     
-    def _execute_backtest(self, params, direction):
+    def _execute_backtest(self, params, direction, date=None):
         """Execute backtest for a specific direction (puts or calls)"""
         trades = []
         capital = params['initial_capital']
@@ -121,19 +122,40 @@ class StrategyBacktester:
         trades_attempted = 0
         trades_filtered = 0
         
-        for i in range(params['num_trades'] * 3):  # Attempt 3x trades to account for filters
+        # Generate realistic historical data if date is provided
+        if date:
+            scenario_data_list = historical_generator.generate_intraday_data(date, 'SPY')
+            scenario_data = pd.DataFrame(scenario_data_list)
+            # Use scenario data for backtest
+            data_points = len(scenario_data)
+        else:
+            # Fallback to random generation
+            data_points = params['num_trades'] * 3  # Attempt 3x trades to account for filters
+            scenario_data = None
+        
+        for i in range(data_points):
             if len(trades) >= params['num_trades']:
                 break
             
             trades_attempted += 1
             
-            # Simulate market conditions
-            put_call_ratio = 0.8 + np.random.random() * 1.5
-            volume_concentration = np.random.random()
-            current_volume = 50000 + np.random.random() * 150000
-            avg_volume = 100000
-            volume_spike = current_volume / avg_volume
-            iv_percentile = np.random.random() * 100
+            # Get market conditions from scenario or random generation
+            if scenario_data is not None and i < len(scenario_data):
+                data_point = scenario_data.iloc[i]
+                put_call_ratio = data_point['put_call_ratio']
+                current_volume = data_point['total_volume']
+                avg_volume = scenario_data['total_volume'].mean()
+                volume_spike = current_volume / avg_volume if avg_volume > 0 else 1.0
+                iv_percentile = data_point['iv_percentile']
+                volume_concentration = 0.6 + np.random.random() * 0.3  # Reasonable range
+            else:
+                # Random generation fallback
+                put_call_ratio = 0.8 + np.random.random() * 1.5
+                volume_concentration = np.random.random()
+                current_volume = 50000 + np.random.random() * 150000
+                avg_volume = 100000
+                volume_spike = current_volume / avg_volume
+                iv_percentile = np.random.random() * 100
             
             # Multi-timeframe alignment
             tf5min = put_call_ratio + (np.random.random() - 0.5) * 0.1

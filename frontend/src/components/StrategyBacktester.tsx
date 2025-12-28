@@ -40,7 +40,12 @@ const StrategyBacktester: React.FC = () => {
     }, 200);
 
     try {
-      const result = await apiService.compareStrategies(params);
+      // Add selectedDate to params if available
+      const paramsWithDate = selectedDate 
+        ? { ...params, date: selectedDate.toISOString().split('T')[0] }
+        : params;
+      
+      const result = await apiService.compareStrategies(paramsWithDate);
       setResults(result);
       setProgress(100);
     } catch (error) {

@@ -151,9 +151,10 @@ def get_strike_analysis(symbol):
 def run_backtest():
     """Run strategy backtest with specified parameters"""
     params = request.json
+    date = params.pop('date', None) if params else None
     
     try:
-        result = strategy_backtester.run_backtest(params)
+        result = strategy_backtester.run_backtest(params, date=date)
         return jsonify(result)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -163,9 +164,10 @@ def run_backtest():
 def compare_strategies():
     """Run and compare multiple strategies"""
     params = request.json
+    date = params.pop('date', None) if params else None
     
     try:
-        result = strategy_backtester.compare_strategies(params)
+        result = strategy_backtester.compare_strategies(params, date=date)
         return jsonify(result)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
