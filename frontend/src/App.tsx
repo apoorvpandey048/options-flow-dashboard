@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, Navigate, useNavigate } from 'react-router-dom';
-import { Activity, TrendingUp, LogOut } from 'lucide-react';
+import { Activity, TrendingUp, LogOut, Calendar } from 'lucide-react';
 import OptionsFlowMonitor from './components/OptionsFlowMonitor';
 import StrategyBacktester from './components/StrategyBacktester';
+import HistoricalReplay from './components/HistoricalReplay';
 import Home from './components/Home';
 import Login from './components/Login';
 import { apiService } from './services/api';
@@ -100,6 +101,13 @@ function App() {
                     Monitor
                   </Link>
                   <Link
+                    to="/historical"
+                    className="px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors flex items-center gap-2"
+                  >
+                    <Calendar className="w-4 h-4" />
+                    Historical
+                  </Link>
+                  <Link
                     to="/backtest"
                     className="px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors flex items-center gap-2"
                   >
@@ -135,6 +143,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <OptionsFlowMonitor />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/historical"
+            element={
+              <ProtectedRoute>
+                <HistoricalReplay />
               </ProtectedRoute>
             }
           />

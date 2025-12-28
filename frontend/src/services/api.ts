@@ -5,8 +5,8 @@ import axios from 'axios';
 import { io, Socket } from 'socket.io-client';
 import { MonitorData, BacktestParams, BacktestResult, ComparisonResult } from '../types';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
-const WS_URL = process.env.REACT_APP_WS_URL || 'http://localhost:5000';
+const API_BASE_URL = process.env.REACT_APP_API_URL || '';
+const WS_URL = process.env.REACT_APP_WS_URL || 'http://localhost:10000';
 
 class ApiService {
   private socket: Socket | null = null;

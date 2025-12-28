@@ -14,6 +14,7 @@ from options_monitor import options_monitor
 from strategy_backtester import strategy_backtester
 from data_fetcher import data_fetcher
 from auth import register_user, login_user, token_required
+from historical_data_loader import historical_loader
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = Config.SECRET_KEY
@@ -163,6 +164,77 @@ def compare_strategies():
     try:
         result = strategy_backtester.compare_strategies(params)
         return jsonify(result)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+# Historical Data Replay endpoints
+@app.route('/api/historical/dates', methods=['GET'])
+@token_required
+def get_historical_dates():
+    """Get available historical dates with summaries"""
+    try:
+        dates = historical_loader.get_available_dates()
+        summaries = [historical_loader.get_date_summary(date) for date in dates]
+        return jsonify({
+            'count': len(dates),
+            'dates': summaries
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/historical/analysis/<date>', methods=['GET'])
+@token_required
+def get_historical_analysis(date):
+    """Get full day analysis for a specific date"""
+    try:
+        analysis = historical_loader.get_full_day_analysis(date)
+        if not analysis:
+            return jsonify({'error': 'Date not found'}), 404
+        return jsonify(analysis)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/historical/unusual/<date>', methods=['GET'])
+@token_required
+def get_historical_unusual(date):
+    """Get unusual activity for a date"""
+    try:
+        min_ratio = float(request.args.get('min_ratio', 1.5))
+        activity = historical_loader.get_unusual_activity(date, min_ratio)
+        return jsonify({
+            'date': date,
+            'count': len(activity),
+            'activity': activity
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/historical/chart/<date>/<ticker>', methods=['GET'])
+@token_required
+def get_historical_chart(date, ticker):
+    """Get intraday chart data for a specific contract"""
+    try:
+        chart_data = historical_loader.get_intraday_chart_data(date, ticker)
+        if not chart_data:
+            return jsonify({'error': 'Data not found'}), 404
+        return jsonify(chart_data)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/historical/flow-score/<date>/<ticker>', methods=['GET'])
+@token_required
+def get_historical_flow_score(date, ticker):
+    """Get flow score calculation for a specific contract"""
+    try:
+        score = historical_loader.calculate_flow_score(date, ticker)
+        if not score:
+            return jsonify({'error': 'Contract not found'}), 404
+        return jsonify(score)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 

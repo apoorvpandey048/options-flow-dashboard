@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Activity, TrendingUp, Zap, Shield, BarChart3, Eye } from 'lucide-react';
+import { Activity, TrendingUp, Zap, Shield, BarChart3, Eye, Calendar } from 'lucide-react';
 
 const Home: React.FC = () => {
   return (
@@ -22,6 +22,13 @@ const Home: React.FC = () => {
             >
               <Activity className="w-5 h-5" />
               Start Monitoring
+            </Link>
+            <Link
+              to="/historical"
+              className="px-8 py-4 bg-green-600 hover:bg-green-700 rounded-lg font-bold text-lg transition-colors flex items-center gap-2"
+            >
+              <Calendar className="w-5 h-5" />
+              View Historical
             </Link>
             <Link
               to="/backtest"
