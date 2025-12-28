@@ -15,6 +15,9 @@ const OptionsFlowMonitor: React.FC = () => {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [wsConnected, setWsConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [dataMode, setDataMode] = useState<'live' | 'historical'>('live');
+  const [historicalDates, setHistoricalDates] = useState<string[]>([]);
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
     try {
@@ -92,22 +95,65 @@ const OptionsFlowMonitor: React.FC = () => {
     <div className="w-full min-h-screen p-4" style={{ backgroundColor: '#000000' }}>
       <div className="max-w-[1600px] mx-auto">
         {/* Header Controls */}
-        <div className="mb-4 flex justify-between items-center">
-          <div className="flex gap-2">
-            {SYMBOLS.map(symbol => (
-              <button
-                key={symbol}
-                onClick={() => setSelectedSymbol(symbol)}
-                className={`px-3 py-1.5 text-sm font-bold transition-colors ${
-                  selectedSymbol === symbol
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
-                }`}
+        <div className="mb-4 space-y-3">
+          {/* Data Mode Toggle */}
+          <div className="flex gap-2 items-center">
+            <span className="text-gray-400 text-sm">Data Mode:</span>
+            <button
+              onClick={() => {
+                setDataMode('live');
+                setSelectedDate(null);
+              }}
+              className={`px-4 py-1.5 text-sm font-bold transition-colors ${
+                dataMode === 'live'
+                  ? 'bg-green-600 text-white'
+                  : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+              }`}
+            >
+              🔴 Live Data
+            </button>
+            <button
+              onClick={() => setDataMode('historical')}
+              className={`px-4 py-1.5 text-sm font-bold transition-colors ${
+                dataMode === 'historical'
+                  ? 'bg-purple-600 text-white'
+                  : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+              }`}
+            >
+              📅 Historical Data
+            </button>
+            {dataMode === 'historical' && (
+              <select
+                value={selectedDate || ''}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                className="px-3 py-1.5 bg-gray-800 text-white border border-gray-700 rounded text-sm"
               >
-                ${symbol}
-              </button>
-            ))}
+                <option value="">Select Date...</option>
+                <option value="2025-12-27">Dec 27, 2025</option>
+                <option value="2025-12-26">Dec 26, 2025</option>
+                <option value="2025-12-24">Dec 24, 2025</option>
+                <option value="2025-12-23">Dec 23, 2025</option>
+              </select>
+            )}
           </div>
+          
+          {/* Symbol Buttons */}
+          <div className="flex justify-between items-center">
+            <div className="flex gap-2">
+              {SYMBOLS.map(symbol => (
+                <button
+                  key={symbol}
+                  onClick={() => setSelectedSymbol(symbol)}
+                  className={`px-3 py-1.5 text-sm font-bold transition-colors ${
+                    selectedSymbol === symbol
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                  }`}
+                >
+                  ${symbol}
+                </button>
+              ))}
+            </div>
           
           <div className="flex gap-2 items-center">
             <div className="flex gap-1">
@@ -141,7 +187,11 @@ const OptionsFlowMonitor: React.FC = () => {
           <div className="flex justify-between items-start mb-6">
             <div>
               <div className="text-blue-400 text-sm mb-1">
-                Data for {selectedSymbol} last {selectedTimeframe} - and refresh every 2s second
+                {dataMode === 'live' ? (
+                  <>🔴 LIVE: {selectedSymbol} last {selectedTimeframe} - refresh every 2s</>
+                ) : (
+                  <>📅 HISTORICAL: {selectedDate || 'Select a date'} - {selectedSymbol}</>
+                )}
               </div>
               <h1 className="text-white text-2xl font-bold">
                 ${selectedSymbol} Option Volume ({currentTime.toLocaleDateString('en-US', { 
