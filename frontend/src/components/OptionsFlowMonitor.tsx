@@ -12,6 +12,7 @@ const OptionsFlowMonitor: React.FC = () => {
   const [monitorData, setMonitorData] = useState<MonitorData | null>(null);
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [lastUpdate, setLastUpdate] = useState(new Date());
+  const [currentTime, setCurrentTime] = useState(new Date());
   const [wsConnected, setWsConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -32,6 +33,15 @@ const OptionsFlowMonitor: React.FC = () => {
     fetchData();
   }, [fetchData]);
 
+  // Live clock update every second
+  useEffect(() => {
+    const clockInterval = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+
+    return () => clearInterval(clockInterval);
+  }, []);
+
   // Auto-refresh with WebSocket
   useEffect(() => {
     if (!autoRefresh) return;
@@ -48,8 +58,8 @@ const OptionsFlowMonitor: React.FC = () => {
       setLastUpdate(new Date());
     });
 
-    // Fallback polling every 5 seconds
-    const interval = setInterval(fetchData, 5000);
+    // Fallback polling every 2 seconds
+    const interval = setInterval(fetchData, 2000);
 
     return () => {
       clearInterval(interval);
@@ -134,11 +144,11 @@ const OptionsFlowMonitor: React.FC = () => {
                 Data for {selectedSymbol} last {selectedTimeframe} - and refresh every 2s second
               </div>
               <h1 className="text-white text-2xl font-bold">
-                ${selectedSymbol} Option Volume ({new Date().toLocaleDateString('en-US', { 
+                ${selectedSymbol} Option Volume ({currentTime.toLocaleDateString('en-US', { 
                   month: '2-digit', 
                   day: '2-digit', 
                   year: 'numeric' 
-                })} EXP) {new Date().toLocaleTimeString('en-US', { 
+                })} EXP) {currentTime.toLocaleTimeString('en-US', { 
                   hour: '2-digit', 
                   minute: '2-digit', 
                   second: '2-digit',
