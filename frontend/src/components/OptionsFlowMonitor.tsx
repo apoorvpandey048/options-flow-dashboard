@@ -232,30 +232,31 @@ const OptionsFlowMonitor: React.FC = () => {
               ))}
             </div>
             
-            <div className="flex gap-2 items-center">
-              <div className="flex gap-1">
-                {TIMEFRAMES.map(tf => (
-                  <button
-                    key={tf}
-                    onClick={() => setSelectedTimeframe(tf)}
-                    className={`px-3 py-1.5 text-xs transition-colors ${
-                      selectedTimeframe === tf
-                        ? 'bg-green-700 text-white font-bold'
-                        : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
-                    }`}
-                  >
-                    {tf}
-                  </button>
-                ))}
+            {dataMode === 'live' && (
+              <div className="flex gap-2 items-center">
+                <div className="flex gap-1">
+                  {TIMEFRAMES.map(tf => (
+                    <button
+                      key={tf}
+                      onClick={() => setSelectedTimeframe(tf)}
+                      className={`px-3 py-1.5 text-xs transition-colors ${
+                        selectedTimeframe === tf
+                          ? 'bg-green-700 text-white font-bold'
+                          : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                      }`}
+                    >
+                      {tf}
+                    </button>
+                  ))}
+                </div>
               </div>
-              
-              {wsConnected && (
-                <span className="flex items-center gap-1 text-green-400 text-xs">
-                  <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
-                  LIVE
-                </span>
-              )}
-            </div>
+            )}
+            {dataMode === 'live' && wsConnected && (
+              <span className="flex items-center gap-1 text-green-400 text-xs">
+                <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
+                LIVE
+              </span>
+            )}
           </div>
         </div>
 

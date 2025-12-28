@@ -9,6 +9,9 @@ const StrategyBacktester: React.FC = () => {
   const [results, setResults] = useState<ComparisonResult | null>(null);
   const [dataMode, setDataMode] = useState<'live' | 'historical'>('live');
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [replayTime, setReplayTime] = useState<string>('09:30');
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [playbackSpeed, setPlaybackSpeed] = useState<number>(1000);
 
   const [params, setParams] = useState<BacktestParams>({
     put_call_threshold: 1.1,
@@ -90,22 +93,63 @@ const StrategyBacktester: React.FC = () => {
             Historical Data
           </button>
           {dataMode === 'historical' && (
-            <select
-              value={selectedDate || ''}
-              onChange={(e) => setSelectedDate(e.target.value)}
-              className="px-3 py-2 bg-gray-700 text-white border border-gray-600 rounded text-sm"
-            >
-              <option value="">Select Date...</option>
-              <option value="2025-12-27">Dec 27, 2025</option>
-              <option value="2025-12-26">Dec 26, 2025</option>
-              <option value="2025-12-24">Dec 24, 2025</option>
-              <option value="2025-12-23">Dec 23, 2025</option>
-            </select>
-          )}
-          {dataMode === 'historical' && selectedDate && (
-            <span className="text-sm text-purple-400 ml-2">
-              Testing on: {selectedDate}
-            </span>
+            <div className="flex gap-3 items-center flex-wrap">
+              <select
+                value={selectedDate || ''}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                className="px-3 py-2 bg-gray-700 text-white border border-gray-600 rounded text-sm"
+              >
+                <option value="">Select Date...</option>
+                <option value="2025-12-27">Dec 27, 2025</option>
+                <option value="2025-12-26">Dec 26, 2025</option>
+                <option value="2025-12-24">Dec 24, 2025</option>
+                <option value="2025-12-23">Dec 23, 2025</option>
+                <option value="2025-12-20">Dec 20, 2025</option>
+              </select>
+              
+              {selectedDate && (
+                <>
+                  <div className="flex items-center gap-2">
+                    <span className="text-gray-400 text-sm">Time:</span>
+                    <input
+                      type="time"
+                      value={replayTime}
+                      onChange={(e) => setReplayTime(e.target.value)}
+                      min="09:30"
+                      max="16:00"
+                      step="60"
+                      className="px-3 py-1.5 bg-gray-700 text-white border border-gray-600 rounded text-sm"
+                    />
+                  </div>
+                  
+                  <button
+                    onClick={() => setIsPlaying(!isPlaying)}
+                    className={`px-4 py-1.5 text-sm font-bold rounded transition-colors ${
+                      isPlaying
+                        ? 'bg-red-600 hover:bg-red-700 text-white'
+                        : 'bg-green-600 hover:bg-green-700 text-white'
+                    }`}
+                  >
+                    {isPlaying ? '⏸ Pause' : '▶ Play'}
+                  </button>
+                  
+                  <select
+                    value={playbackSpeed}
+                    onChange={(e) => setPlaybackSpeed(Number(e.target.value))}
+                    className="px-3 py-1.5 bg-gray-700 text-white border border-gray-600 rounded text-sm"
+                  >
+                    <option value="2000">0.5x Speed</option>
+                    <option value="1000">1x Speed</option>
+                    <option value="500">2x Speed</option>
+                    <option value="250">4x Speed</option>
+                  </select>
+                  
+                  <span className="text-sm text-purple-400">
+                    📅 {selectedDate} at {replayTime} {isPlaying && '(Playing...)'}
+                  </span>
+                </>
+              )}
+            </div>
           )}
         </div>
 
