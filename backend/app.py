@@ -15,6 +15,7 @@ from strategy_backtester import strategy_backtester
 from data_fetcher import data_fetcher
 from auth import register_user, login_user, token_required
 from historical_data_loader import historical_loader
+from historical_replay import get_replay_loader
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = Config.SECRET_KEY
@@ -237,6 +238,46 @@ def get_historical_flow_score(date, ticker):
         return jsonify(score)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/historical/replay/snapshots/<date>', methods=['GET'])
+@token_required
+def get_replay_snapshots(date):
+    """Get 4 time-based snapshots for a specific historical date"""
+    try:
+        symbol = request.args.get('symbol', 'SPY')
+        replay_loader = get_replay_loader()
+        snapshots = replay_loader.create_snapshots(date, symbol)
+        
+        return jsonify({
+            'date': date,
+            'symbol': symbol,
+            'snapshots': snapshots,
+            'count': len(snapshots)
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/historical/replay/available-dates', methods=['GET'])
+@token_required
+def get_replay_available_dates():
+    """Get list of available dates for replay"""
+    # Return recent trading days (last 5 trading days)
+    from datetime import datetime, timedelta
+    dates = []
+    current = datetime.now()
+    
+    # Go back up to 10 days to find 5 trading days (weekdays)
+    for i in range(1, 11):
+        date = current - timedelta(days=i)
+        # Skip weekends
+        if date.weekday() < 5:
+            dates.append(date.strftime('%Y-%m-%d'))
+            if len(dates) >= 5:
+                break
+    
+    return jsonify({'dates': dates})
 
 
 # WebSocket events

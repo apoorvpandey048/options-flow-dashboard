@@ -16,8 +16,10 @@ const OptionsFlowMonitor: React.FC = () => {
   const [wsConnected, setWsConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dataMode, setDataMode] = useState<'live' | 'historical'>('live');
-  const [historicalDates, setHistoricalDates] = useState<string[]>([]);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [replayTime, setReplayTime] = useState<string>('09:30');
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [playbackSpeed, setPlaybackSpeed] = useState<number>(1000); // ms per minute
 
   const fetchData = useCallback(async () => {
     try {
@@ -47,7 +49,7 @@ const OptionsFlowMonitor: React.FC = () => {
 
   // Auto-refresh with WebSocket
   useEffect(() => {
-    if (!autoRefresh) return;
+    if (dataMode === 'historical' || !autoRefresh) return;
 
     // Connect WebSocket
     apiService.connectWebSocket(
@@ -67,12 +69,38 @@ const OptionsFlowMonitor: React.FC = () => {
     return () => {
       clearInterval(interval);
       apiService.unsubscribeFromSymbol(selectedSymbol);
-      // Disconnect WebSocket when component unmounts and auto-refresh is off
       if (!autoRefresh) {
         apiService.disconnectWebSocket();
       }
     };
-  }, [autoRefresh, selectedSymbol, selectedTimeframe, fetchData]);
+  }, [autoRefresh, selectedSymbol, selectedTimeframe, fetchData, dataMode]);
+
+  // Historical replay playback
+  useEffect(() => {
+    if (dataMode !== 'historical' || !isPlaying) return;
+
+    const playbackInterval = setInterval(() => {
+      setReplayTime(prevTime => {
+        const [hours, minutes] = prevTime.split(':').map(Number);
+        let totalMinutes = hours * 60 + minutes + 1;
+        
+        // Stop at market close (16:00)
+        if (totalMinutes >= 16 * 60) {
+          setIsPlaying(false);
+          return '16:00';
+        }
+        
+        const newHours = Math.floor(totalMinutes / 60);
+        const newMinutes = totalMinutes % 60;
+        return `${String(newHours).padStart(2, '0')}:${String(newMinutes).padStart(2, '0')}`;
+      });
+      
+      // Fetch new data to simulate progression
+      fetchData();
+    }, playbackSpeed);
+
+    return () => clearInterval(playbackInterval);
+  }, [dataMode, isPlaying, playbackSpeed, fetchData]);
 
   if (!monitorData) {
     return (
@@ -97,12 +125,13 @@ const OptionsFlowMonitor: React.FC = () => {
         {/* Header Controls */}
         <div className="mb-4 space-y-3">
           {/* Data Mode Toggle */}
-          <div className="flex gap-2 items-center">
+          <div className="flex gap-2 items-center flex-wrap">
             <span className="text-gray-400 text-sm">Data Mode:</span>
             <button
               onClick={() => {
                 setDataMode('live');
                 setSelectedDate(null);
+                setIsPlaying(false);
               }}
               className={`px-4 py-1.5 text-sm font-bold transition-colors ${
                 dataMode === 'live'
@@ -120,20 +149,63 @@ const OptionsFlowMonitor: React.FC = () => {
                   : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
               }`}
             >
-              📅 Historical Data
+              📅 Historical Replay
             </button>
+            
             {dataMode === 'historical' && (
-              <select
-                value={selectedDate || ''}
-                onChange={(e) => setSelectedDate(e.target.value)}
-                className="px-3 py-1.5 bg-gray-800 text-white border border-gray-700 rounded text-sm"
-              >
-                <option value="">Select Date...</option>
-                <option value="2025-12-27">Dec 27, 2025</option>
-                <option value="2025-12-26">Dec 26, 2025</option>
-                <option value="2025-12-24">Dec 24, 2025</option>
-                <option value="2025-12-23">Dec 23, 2025</option>
-              </select>
+              <>
+                <select
+                  value={selectedDate || ''}
+                  onChange={(e) => {
+                    setSelectedDate(e.target.value);
+                    setReplayTime('09:30');
+                    setIsPlaying(false);
+                  }}
+                  className="px-3 py-1.5 bg-gray-800 text-white border border-gray-700 rounded text-sm"
+                >
+                  <option value="">Select Date...</option>
+                  <option value="2025-12-27">Dec 27, 2025</option>
+                  <option value="2025-12-26">Dec 26, 2025</option>
+                  <option value="2025-12-24">Dec 24, 2025</option>
+                  <option value="2025-12-23">Dec 23, 2025</option>
+                  <option value="2025-12-20">Dec 20, 2025</option>
+                </select>
+                
+                {selectedDate && (
+                  <>
+                    <input
+                      type="time"
+                      value={replayTime}
+                      onChange={(e) => setReplayTime(e.target.value)}
+                      min="09:30"
+                      max="16:00"
+                      step="60"
+                      className="px-3 py-1.5 bg-gray-800 text-white border border-gray-700 rounded text-sm"
+                    />
+                    
+                    <button
+                      onClick={() => setIsPlaying(!isPlaying)}
+                      className={`px-4 py-1.5 text-sm font-bold transition-colors ${
+                        isPlaying
+                          ? 'bg-red-600 text-white hover:bg-red-700'
+                          : 'bg-blue-600 text-white hover:bg-blue-700'
+                      }`}
+                    >
+                      {isPlaying ? '⏸ Pause' : '▶ Play'}
+                    </button>
+                    
+                    <select
+                      value={playbackSpeed}
+                      onChange={(e) => setPlaybackSpeed(Number(e.target.value))}
+                      className="px-3 py-1.5 bg-gray-800 text-white border border-gray-700 rounded text-sm"
+                    >
+                      <option value="500">2x Speed</option>
+                      <option value="1000">1x Speed</option>
+                      <option value="2000">0.5x Speed</option>
+                    </select>
+                  </>
+                )}
+              </>
             )}
           </div>
           
@@ -191,15 +263,15 @@ const OptionsFlowMonitor: React.FC = () => {
                 {dataMode === 'live' ? (
                   <>🔴 LIVE: {selectedSymbol} last {selectedTimeframe} - refresh every 2s</>
                 ) : (
-                  <>📅 HISTORICAL: {selectedDate || 'Select a date'} - {selectedSymbol}</>
+                  <>📅 HISTORICAL REPLAY: {selectedDate || 'Select a date'} at {replayTime} - {selectedSymbol} {isPlaying && '(Playing...)'}</>
                 )}
               </div>
               <h1 className="text-white text-2xl font-bold">
-                ${selectedSymbol} Option Volume ({currentTime.toLocaleDateString('en-US', { 
+                ${selectedSymbol} Option Volume ({dataMode === 'historical' && selectedDate ? selectedDate : currentTime.toLocaleDateString('en-US', { 
                   month: '2-digit', 
                   day: '2-digit', 
                   year: 'numeric' 
-                })} EXP) {currentTime.toLocaleTimeString('en-US', { 
+                })} EXP) {dataMode === 'historical' ? replayTime : currentTime.toLocaleTimeString('en-US', { 
                   hour: '2-digit', 
                   minute: '2-digit', 
                   second: '2-digit',

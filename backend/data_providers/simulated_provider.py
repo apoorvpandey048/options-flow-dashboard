@@ -92,21 +92,28 @@ class SimulatedDataProvider(BaseDataProvider):
         # Safe division with guaranteed non-zero denominators
         call_ratio = round(call_buy / max(call_sell, 1), 4)
         put_ratio = round(put_buy / max(put_sell, 1), 4)
-        put_call_ratio = round(put_buy / max(call_buy, 1), 4)
+        put_call_ratio = round((put_buy + put_sell) / max((call_buy + call_sell), 1), 4)
         
         return {
             'symbol': symbol,
             'timeframe': timeframe,
             'timestamp': datetime.now().isoformat(),
-            'call_buy': call_buy,
-            'call_sell': call_sell,
-            'put_buy': put_buy,
-            'put_sell': put_sell,
-            'call_ratio': call_ratio,
-            'put_ratio': put_ratio,
+            'calls': {
+                'total': call_buy + call_sell,
+                'buy': call_buy,
+                'sell': call_sell,
+                'ratio': call_ratio
+            },
+            'puts': {
+                'total': put_buy + put_sell,
+                'buy': put_buy,
+                'sell': put_sell,
+                'ratio': put_ratio
+            },
+            'sentiment': 'bullish' if call_buy > put_buy else 'bearish',
             'put_call_ratio': put_call_ratio,
             'strikes': chain['strikes'],
-            'current_price': chain['current_price']
+            'price': chain['current_price']
         }
     
     def get_historical_options_data(self, symbol: str, days: int = 30) -> List[Dict]:

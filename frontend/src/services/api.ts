@@ -114,6 +114,24 @@ class ApiService {
     return response.data;
   }
 
+  // Historical Replay API
+  async getReplaySnapshots(date: string, symbol: string = 'SPY') {
+    const response = await axios.get(`${API_BASE_URL}/api/historical/replay/snapshots/${date}`, {
+      params: { symbol },
+      headers: this.getAuthHeader(),
+      timeout: 10000
+    });
+    return response.data;
+  }
+
+  async getReplayAvailableDates() {
+    const response = await axios.get(`${API_BASE_URL}/api/historical/replay/available-dates`, {
+      headers: this.getAuthHeader(),
+      timeout: 5000
+    });
+    return response.data;
+  }
+
   // WebSocket methods
   connectWebSocket(onConnect?: () => void, onDisconnect?: () => void) {
     if (this.socket) {
