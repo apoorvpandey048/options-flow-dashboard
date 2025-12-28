@@ -62,6 +62,17 @@ const HistoricalReplay: React.FC = () => {
     loadAvailableDates();
   }, []);
 
+  // Auto-refresh chart every 2 seconds
+  useEffect(() => {
+    if (selectedDate && selectedTicker) {
+      const interval = setInterval(() => {
+        loadChartData(selectedDate, selectedTicker);
+      }, 2000);
+      
+      return () => clearInterval(interval);
+    }
+  }, [selectedDate, selectedTicker]);
+
   const loadAvailableDates = async () => {
     try {
       const token = localStorage.getItem('token');
