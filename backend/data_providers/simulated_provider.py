@@ -113,22 +113,15 @@ class SimulatedDataProvider(BaseDataProvider):
             'symbol': symbol,
             'timeframe': timeframe,
             'timestamp': datetime.now().isoformat(),
-            'calls': {
-                'total': call_buy + call_sell,
-                'buy': call_buy,
-                'sell': call_sell,
-                'ratio': call_ratio
-            },
-            'puts': {
-                'total': put_buy + put_sell,
-                'buy': put_buy,
-                'sell': put_sell,
-                'ratio': put_ratio
-            },
-            'sentiment': 'bullish' if call_buy > put_buy else 'bearish',
+            'call_buy': call_buy,
+            'call_sell': call_sell,
+            'put_buy': put_buy,
+            'put_sell': put_sell,
+            'call_ratio': call_ratio,
+            'put_ratio': put_ratio,
             'put_call_ratio': put_call_ratio,
             'strikes': chain['strikes'],
-            'price': chain['current_price']
+            'current_price': chain['current_price']
         }
     
     def get_historical_options_data(self, symbol: str, days: int = 30) -> List[Dict]:
