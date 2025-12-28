@@ -7,6 +7,8 @@ const StrategyBacktester: React.FC = () => {
   const [isRunning, setIsRunning] = useState(false);
   const [progress, setProgress] = useState(0);
   const [results, setResults] = useState<ComparisonResult | null>(null);
+  const [dataMode, setDataMode] = useState<'live' | 'historical'>('live');
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
   const [params, setParams] = useState<BacktestParams>({
     put_call_threshold: 1.1,
@@ -59,6 +61,44 @@ const StrategyBacktester: React.FC = () => {
           <p className="text-gray-400">
             Multi-Signal Analysis with Volume Spikes, IV Filters & Timeframe Confirmation
           </p>
+        </div>
+
+        {/* Data Mode Toggle */}
+        <div className="mb-6 flex gap-2 items-center p-4 bg-gray-800 rounded-xl border border-gray-700">
+          <span className="text-gray-400 text-sm font-semibold">Data Mode:</span>
+          <button
+            onClick={() => {
+              setDataMode('live');
+              setSelectedDate(null);
+            }}
+            className={`px-4 py-2 text-sm font-bold transition-colors rounded ${\n              dataMode === 'live'\n                ? 'bg-green-600 text-white'\n                : 'bg-gray-700 text-gray-400 hover:bg-gray-600'\n            }`}
+          >
+            🔴 Live Data (Simulated)
+          </button>
+          <button
+            onClick={() => setDataMode('historical')}
+            className={`px-4 py-2 text-sm font-bold transition-colors rounded ${\n              dataMode === 'historical'\n                ? 'bg-purple-600 text-white'\n                : 'bg-gray-700 text-gray-400 hover:bg-gray-600'\n            }`}
+          >
+            📅 Historical Data
+          </button>
+          {dataMode === 'historical' && (
+            <select
+              value={selectedDate || ''}
+              onChange={(e) => setSelectedDate(e.target.value)}
+              className="px-3 py-2 bg-gray-700 text-white border border-gray-600 rounded text-sm"
+            >
+              <option value="">Select Date...</option>
+              <option value="2025-12-27">Dec 27, 2025</option>
+              <option value="2025-12-26">Dec 26, 2025</option>
+              <option value="2025-12-24">Dec 24, 2025</option>
+              <option value="2025-12-23">Dec 23, 2025</option>
+            </select>
+          )}
+          {dataMode === 'historical' && selectedDate && (
+            <span className="text-sm text-purple-400 ml-2">
+              Testing on: {selectedDate}
+            </span>
+          )}
         </div>
 
         {/* Strategy Parameters */}
