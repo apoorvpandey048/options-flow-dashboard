@@ -71,15 +71,23 @@ const StrategyBacktester: React.FC = () => {
               setDataMode('live');
               setSelectedDate(null);
             }}
-            className={`px-4 py-2 text-sm font-bold transition-colors rounded ${\n              dataMode === 'live'\n                ? 'bg-green-600 text-white'\n                : 'bg-gray-700 text-gray-400 hover:bg-gray-600'\n            }`}
+            className={`px-4 py-2 text-sm font-bold transition-colors rounded ${
+              dataMode === 'live'
+                ? 'bg-green-600 text-white'
+                : 'bg-gray-700 text-gray-400 hover:bg-gray-600'
+            }`}
           >
-            🔴 Live Data (Simulated)
+            Live Data (Simulated)
           </button>
           <button
             onClick={() => setDataMode('historical')}
-            className={`px-4 py-2 text-sm font-bold transition-colors rounded ${\n              dataMode === 'historical'\n                ? 'bg-purple-600 text-white'\n                : 'bg-gray-700 text-gray-400 hover:bg-gray-600'\n            }`}
+            className={`px-4 py-2 text-sm font-bold transition-colors rounded ${
+              dataMode === 'historical'
+                ? 'bg-purple-600 text-white'
+                : 'bg-gray-700 text-gray-400 hover:bg-gray-600'
+            }`}
           >
-            📅 Historical Data
+            Historical Data
           </button>
           {dataMode === 'historical' && (
             <select
