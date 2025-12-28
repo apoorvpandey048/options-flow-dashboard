@@ -5,8 +5,15 @@ import axios from 'axios';
 import { io, Socket } from 'socket.io-client';
 import { MonitorData, BacktestParams, BacktestResult, ComparisonResult } from '../types';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || '';
-const WS_URL = process.env.REACT_APP_WS_URL || 'http://localhost:10000';
+// Use backend URL in production, proxy in development
+const API_BASE_URL = process.env.REACT_APP_API_URL || 
+  (process.env.NODE_ENV === 'production' 
+    ? 'https://options-flow-dashboard.onrender.com' 
+    : '');
+const WS_URL = process.env.REACT_APP_WS_URL || 
+  (process.env.NODE_ENV === 'production'
+    ? 'https://options-flow-dashboard.onrender.com'
+    : 'http://localhost:10000');
 
 class ApiService {
   private socket: Socket | null = null;
