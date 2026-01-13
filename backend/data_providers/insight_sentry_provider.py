@@ -487,9 +487,52 @@ class InsightSentryProvider(BaseDataProvider):
         
         return 0.0
     
+    def _get_option_volume_from_series(self, option_symbol: str, minutes: int) -> int:
+        """
+        Fetch REAL traded volume for an option from series endpoint
+        
+        Args:
+            option_symbol: Full option symbol (e.g., 'OPRA:SPY260113C695.0')
+            minutes: Number of minutes to aggregate (e.g., 5, 10, 30, 60)
+            
+        Returns:
+            Total volume over the specified timeframe
+        """
+        try:
+            # Request minute bars (up to the number of minutes we want)
+            data = self._make_request(
+                "GET",
+                f"/v3/symbols/{option_symbol}/series",
+                params={
+                    "bar_type": "minute",
+                    "bar_interval": 1,
+                    "dp": min(minutes, 60)  # Request enough data points
+                }
+            )
+            
+            if not data or 'series' not in data:
+                return 0
+            
+            series = data['series']
+            if not series:
+                return 0
+            
+            # Sum volume from the most recent bars (up to 'minutes' bars)
+            total_volume = 0
+            for bar in series[-minutes:]:
+                vol = bar.get('volume', 0)
+                if vol:
+                    total_volume += int(vol)
+            
+            return total_volume
+            
+        except Exception as e:
+            print(f"[InsightSentry] Error fetching series for {option_symbol}: {e}")
+            return 0
+    
     def get_options_flow_data(self, symbol: str, timeframe: str = '5min', replay_date: str = None, replay_time: str = None) -> Dict:
         """
-        Get options flow data for specified timeframe
+        Get options flow data for specified timeframe using REAL VOLUMES from series endpoint
         
         Args:
             symbol: Stock symbol
@@ -502,7 +545,7 @@ class InsightSentryProvider(BaseDataProvider):
 
         # Current stock price
         current_price = float(self.get_stock_price(symbol) or 0.0)
-        print(f"[InsightSentry] get_options_flow_data: symbol={symbol} current_price={current_price}")
+        print(f"[InsightSentry] get_options_flow_data: symbol={symbol} current_price={current_price} timeframe={timeframe}")
 
         # Try to get structured option chain by expiration (preferred)
         info = self.get_symbol_info(symbol)
@@ -527,13 +570,13 @@ class InsightSentryProvider(BaseDataProvider):
             return {
                 'symbol': symbol,
                 'timeframe': timeframe,
-                'call_buy': 1000,
-                'call_sell': 1000,
-                'put_buy': 1000,
-                'put_sell': 1000,
+                'call_buy': 0,
+                'call_sell': 0,
+                'put_buy': 0,
+                'put_sell': 0,
                 'call_ratio': 1.0,
                 'put_ratio': 1.0,
-                'put_call_ratio': 1.0,
+                'put_call_ratio': 0,
                 'strikes': [],
                 'raw_options': [],
                 'current_price': current_price,
@@ -543,98 +586,72 @@ class InsightSentryProvider(BaseDataProvider):
 
         print(f"[InsightSentry] Retrieved {len(options)} option entries")
 
-        # Aggregate volumes per strike
+        # Build strike map from options chain
         strike_map = {}
-        total_call_vol = 0
-        total_put_vol = 0
-
         for opt in options:
             strike = opt.get('strike')
             if strike is None:
                 continue
-            typ = (opt.get('type') or '').lower()
-            # Prefer explicit volume; fall back to last trade size or open interest when volume missing
-            vol_raw = opt.get('volume') or opt.get('last_size') or opt.get('open_interest') or opt.get('oi') or 0
-            try:
-                vol = int(float(vol_raw))
-            except Exception:
-                vol = 0
-
-            # Log when we used a fallback (helps debug why volumes are zero)
-            if not opt.get('volume') and vol > 0:
-                print(f"[InsightSentry] Using fallback volume for strike={strike} type={typ} vol={vol}")
-
+            
             if strike not in strike_map:
                 strike_map[strike] = {
                     'strike': float(strike),
                     'call_volume': 0,
-                    'put_volume': 0
+                    'put_volume': 0,
+                    'call_option': None,
+                    'put_option': None
                 }
-
+            
+            typ = (opt.get('type') or '').lower()
             if typ == 'call':
-                strike_map[strike]['call_volume'] += vol
-                total_call_vol += vol
+                strike_map[strike]['call_option'] = opt
             elif typ == 'put':
-                strike_map[strike]['put_volume'] += vol
-                total_put_vol += vol
+                strike_map[strike]['put_option'] = opt
 
-        # Build strikes list sorted by proximity to current price
+        # Sort strikes by proximity to current price and take top 20
         strikes_list = list(strike_map.values())
         strikes_list.sort(key=lambda s: abs(s['strike'] - current_price))
-
-        # If all observed volumes are zero, fall back to aggregating open interest (oi)
-        if total_call_vol == 0 and total_put_vol == 0:
-            print("[InsightSentry] All volumes zero — falling back to open interest aggregation")
-            oi_call_total = 0
-            oi_put_total = 0
-            # reset strike_map volumes
-            for s in strike_map.values():
-                s['call_volume'] = 0
-                s['put_volume'] = 0
-
-            for opt in options:
-                strike = opt.get('strike')
-                if strike is None:
-                    continue
-                typ = (opt.get('type') or '').lower()
-                oi_raw = opt.get('open_interest') or opt.get('oi') or opt.get('openInt') or 0
-                try:
-                    oi_val = int(float(oi_raw))
-                except Exception:
-                    oi_val = 0
-
-                # further fallback to last_size/bid_size/ask_size
-                if oi_val == 0:
-                    oi_raw2 = opt.get('last_size') or opt.get('bid_size') or opt.get('ask_size') or 0
-                    try:
-                        oi_val = int(float(oi_raw2))
-                    except Exception:
-                        oi_val = 0
-
-                if oi_val <= 0:
-                    continue
-
-                if strike not in strike_map:
-                    strike_map[strike] = {
-                        'strike': float(strike),
-                        'call_volume': 0,
-                        'put_volume': 0
-                    }
-
-                if typ == 'call':
-                    strike_map[strike]['call_volume'] += oi_val
-                    oi_call_total += oi_val
-                elif typ == 'put':
-                    strike_map[strike]['put_volume'] += oi_val
-                    oi_put_total += oi_val
-
-            # update totals to use oi totals for heuristics
-            total_call_vol = oi_call_total
-            total_put_vol = oi_put_total
-
-            strikes_list = list(strike_map.values())
-            strikes_list.sort(key=lambda s: abs(s['strike'] - current_price))
-
+        top_strikes = strikes_list[:20]
+        
+        print(f"[InsightSentry] Fetching REAL volumes from series for {len(top_strikes)} strikes...")
+        
+        # Parse timeframe to determine how many minutes to aggregate
+        timeframe_minutes = {
+            '5min': 5,
+            '10min': 10,
+            '30min': 30,
+            '60min': 60
+        }.get(timeframe, 5)
+        
+        # Fetch real volumes from series endpoint for top strikes
+        total_call_vol = 0
+        total_put_vol = 0
+        
+        for strike_data in top_strikes:
+            call_opt = strike_data['call_option']
+            put_opt = strike_data['put_option']
+            
+            # Fetch call volume from series
+            if call_opt:
+                call_symbol = call_opt.get('symbol')
+                call_vol = self._get_option_volume_from_series(call_symbol, timeframe_minutes)
+                strike_data['call_volume'] = call_vol
+                total_call_vol += call_vol
+            
+            # Fetch put volume from series
+            if put_opt:
+                put_symbol = put_opt.get('symbol')
+                put_vol = self._get_option_volume_from_series(put_symbol, timeframe_minutes)
+                strike_data['put_volume'] = put_vol
+                total_put_vol += put_vol
+        
+        print(f"[InsightSentry] Total REAL volumes: calls={total_call_vol}, puts={total_put_vol}")
+        
+        # Remove option objects from strike data (not needed in response)
+        for strike_data in top_strikes:
+            strike_data.pop('call_option', None)
+            strike_data.pop('put_option', None)
+        
         # Compute buy/sell heuristic (split observed volume evenly)
         call_buy = int(total_call_vol / 2)
         call_sell = int(total_call_vol - call_buy)
@@ -655,7 +672,7 @@ class InsightSentryProvider(BaseDataProvider):
             'call_ratio': call_ratio,
             'put_ratio': put_ratio,
             'put_call_ratio': put_call_ratio,
-            'strikes': strikes_list[:20],
+            'strikes': top_strikes,  # Return the top strikes with real volumes
             'raw_options': options,
             'total_options': len(options),
             'current_price': current_price,
