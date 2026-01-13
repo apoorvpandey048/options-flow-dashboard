@@ -535,6 +535,7 @@ class InsightSentryProvider(BaseDataProvider):
                 'put_ratio': 1.0,
                 'put_call_ratio': 1.0,
                 'strikes': [],
+                'raw_options': [],
                 'current_price': current_price,
                 'timestamp': datetime.now().isoformat(),
                 'provider': 'InsightSentry'
@@ -655,6 +656,7 @@ class InsightSentryProvider(BaseDataProvider):
             'put_ratio': put_ratio,
             'put_call_ratio': put_call_ratio,
             'strikes': strikes_list[:20],
+            'raw_options': options,
             'total_options': len(options),
             'current_price': current_price,
             'timestamp': datetime.now().isoformat(),
