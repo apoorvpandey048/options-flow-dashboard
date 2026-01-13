@@ -287,7 +287,7 @@ const OptionsFlowMonitor: React.FC = () => {
             </div>
           </div>
 
-          {/* Buy/Sell Ratio Headers */}
+          {/* Buy/Sell Ratio Headers with P/C Ratio */}
           <div className="flex justify-between mb-4 text-sm">
             <div className="w-1/2 flex justify-between items-center px-4">
               <div>
@@ -302,6 +302,35 @@ const OptionsFlowMonitor: React.FC = () => {
                 <div className="bg-gray-900 border border-green-700 px-3 py-1 mt-1">
                   <span className="text-green-400 font-bold">Ratio: {calls.ratio.toFixed(4)}</span>
                 </div>
+              </div>
+            </div>
+            
+            {/* Put/Call Ratio - Center */}
+            <div className="flex flex-col items-center justify-center px-4">
+              <div className="text-xs text-gray-400 mb-1">P/C RATIO</div>
+              <div 
+                className={`bg-gray-900 border px-4 py-2 ${
+                  put_call_ratio > 1.2 
+                    ? 'border-green-600' 
+                    : put_call_ratio < 0.8 
+                    ? 'border-red-600' 
+                    : 'border-yellow-600'
+                }`}
+              >
+                <span 
+                  className={`text-xl font-bold ${
+                    put_call_ratio > 1.2 
+                      ? 'text-green-400' 
+                      : put_call_ratio < 0.8 
+                      ? 'text-red-400' 
+                      : 'text-yellow-400'
+                  }`}
+                >
+                  {put_call_ratio.toFixed(2)}
+                </span>
+              </div>
+              <div className="text-xs text-gray-400 mt-1">
+                {put_call_ratio > 1.2 ? '🐻 Bearish' : put_call_ratio < 0.8 ? '🐂 Bullish' : '⚖️ Neutral'}
               </div>
             </div>
             
