@@ -581,6 +581,59 @@ class InsightSentryProvider(BaseDataProvider):
         strikes_list = list(strike_map.values())
         strikes_list.sort(key=lambda s: abs(s['strike'] - current_price))
 
+        # If all observed volumes are zero, fall back to aggregating open interest (oi)
+        if total_call_vol == 0 and total_put_vol == 0:
+            print("[InsightSentry] All volumes zero — falling back to open interest aggregation")
+            oi_call_total = 0
+            oi_put_total = 0
+            # reset strike_map volumes
+            for s in strike_map.values():
+                s['call_volume'] = 0
+                s['put_volume'] = 0
+
+            for opt in options:
+                strike = opt.get('strike')
+                if strike is None:
+                    continue
+                typ = (opt.get('type') or '').lower()
+                oi_raw = opt.get('open_interest') or opt.get('oi') or opt.get('openInt') or 0
+                try:
+                    oi_val = int(float(oi_raw))
+                except Exception:
+                    oi_val = 0
+
+                # further fallback to last_size/bid_size/ask_size
+                if oi_val == 0:
+                    oi_raw2 = opt.get('last_size') or opt.get('bid_size') or opt.get('ask_size') or 0
+                    try:
+                        oi_val = int(float(oi_raw2))
+                    except Exception:
+                        oi_val = 0
+
+                if oi_val <= 0:
+                    continue
+
+                if strike not in strike_map:
+                    strike_map[strike] = {
+                        'strike': float(strike),
+                        'call_volume': 0,
+                        'put_volume': 0
+                    }
+
+                if typ == 'call':
+                    strike_map[strike]['call_volume'] += oi_val
+                    oi_call_total += oi_val
+                elif typ == 'put':
+                    strike_map[strike]['put_volume'] += oi_val
+                    oi_put_total += oi_val
+
+            # update totals to use oi totals for heuristics
+            total_call_vol = oi_call_total
+            total_put_vol = oi_put_total
+
+            strikes_list = list(strike_map.values())
+            strikes_list.sort(key=lambda s: abs(s['strike'] - current_price))
+
         # Compute buy/sell heuristic (split observed volume evenly)
         call_buy = int(total_call_vol / 2)
         call_sell = int(total_call_vol - call_buy)
