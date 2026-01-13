@@ -3,7 +3,7 @@ import { TrendingUp, TrendingDown, RefreshCw, AlertCircle } from 'lucide-react';
 import { apiService } from '../services/api';
 import { MonitorData } from '../types';
 
-const SYMBOLS = ['SPY', 'QQQ', 'AAPL', 'MSFT', 'NVDA', 'TSLA', 'META', 'GOOGL', 'AMZN'];
+const SYMBOLS = ['SPY', 'QQQ', 'AAPL', 'TSLA'];  // Core 4 symbols using Insight Sentry
 const TIMEFRAMES = ['5min', '10min', '30min', '60min'];
 
 const OptionsFlowMonitor: React.FC = () => {

@@ -12,7 +12,7 @@ const SnapshotReplay: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const SYMBOLS = ['SPY', 'QQQ', 'AAPL', 'MSFT', 'NVDA', 'TSLA'];
+  const SYMBOLS = ['SPY', 'QQQ', 'AAPL', 'TSLA'];  // Core 4 symbols
 
   // Fetch available dates on mount
   useEffect(() => {

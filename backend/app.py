@@ -137,6 +137,29 @@ def get_summary():
     return jsonify(data)
 
 
+@app.route('/api/debug/clear-cache', methods=['POST'])
+def clear_cache():
+    """Debug endpoint to clear data fetcher cache"""
+    try:
+        data_fetcher.cache.clear()
+        return jsonify({'cleared': True}), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/debug/provider', methods=['GET'])
+def debug_provider():
+    """Return the active data provider name for debugging"""
+    try:
+        provider = data_fetcher.provider
+        return jsonify({
+            'provider_name': provider.get_provider_name(),
+            'provider_class': provider.__class__.__name__
+        }), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/api/monitor/<symbol>/strikes', methods=['GET'])
 def get_strike_analysis(symbol):
     """Get detailed strike-level analysis"""
@@ -145,6 +168,36 @@ def get_strike_analysis(symbol):
     
     data = options_monitor.get_strike_analysis(symbol)
     return jsonify(data)
+
+
+@app.route('/api/monitor/<symbol>/ratio', methods=['GET'])
+def get_ratio_only(symbol):
+    """Return minimal data: timestamp and put/call ratio, with a simple recommendation."""
+    if symbol not in Config.SYMBOLS:
+        return jsonify({'error': 'Invalid symbol'}), 400
+
+    timeframe = request.args.get('timeframe', '5min')
+    data = options_monitor.get_monitor_data(symbol, timeframe)
+    ratio = data.get('put_call_ratio', None)
+
+    if ratio is None:
+        return jsonify({'error': 'Ratio not available'}), 500
+
+    # Simple recommendation: buy PUT if ratio>1, buy CALL if ratio<1
+    if ratio > 1.0:
+        recommended = 'PUT'
+    elif ratio < 1.0:
+        recommended = 'CALL'
+    else:
+        recommended = 'NEUTRAL'
+
+    return jsonify({
+        'symbol': symbol,
+        'timeframe': timeframe,
+        'timestamp': data.get('timestamp'),
+        'put_call_ratio': ratio,
+        'recommended_side': recommended
+    })
 
 
 @app.route('/api/backtest/run', methods=['POST'])

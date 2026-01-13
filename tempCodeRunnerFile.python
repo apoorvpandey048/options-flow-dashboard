@@ -1,0 +1,79 @@
+import argparse
+import asyncio
+import json
+import os
+import signal
+import websockets
+
+DEFAULT_WS = "wss://realtime.insightsentry.com/live"
+
+def make_subscribe_msg(api_key, symbol):
+    return {
+        "api_key": api_key,
+        "subscriptions": [
+            {"code": symbol, "type": "series", "bar_type": "tick", "max_bars": 1000}
+        ],
+    }
+
+async def run(ws_url, api_key, symbol, timeout=None):
+    headers = [("x-rapidapi-key", api_key)] if api_key else None
+    subscribe_msg = make_subscribe_msg(api_key, symbol)
+    print("Connecting to", ws_url)
+    async with websockets.connect(ws_url, extra_headers=headers) as ws:
+        await ws.send(json.dumps(subscribe_msg))
+        print("Subscribed; logging incoming messages. Ctrl-C to stop.")
+
+        async def reader():
+            async for raw in ws:
+                try:
+                    obj = json.loads(raw)
+                except Exception:
+                    print("RAW:", raw)
+                    continue
+                print(json.dumps(obj, indent=2))
+                # quick checks (top-level and nested data fields)
+                def check_dict(d):
+                    for k in ("type", "side", "aggressor"):
+                        if k in d:
+                            print(f"=> Found aggressor field '{k}':", d.get(k))
+                    for k in ("strike", "option_symbol", "contract", "price", "size", "volume"):
+                        if k in d:
+                            print(f"-> Contains {k}:", d.get(k))
+
+                if isinstance(obj, dict):
+                    check_dict(obj)
+                    # check common nested keys
+                    for nested in ("data", "payload", "tick", "message"):
+                        if nested in obj and isinstance(obj[nested], dict):
+                            check_dict(obj[nested])
+                print("-" * 60)
+
+        # run reader until cancelled
+        try:
+            await reader()
+        except asyncio.CancelledError:
+            pass
+
+def main():
+    p = argparse.ArgumentParser()
+    p.add_argument("--ws", default=os.getenv("WS_URL", DEFAULT_WS))
+    p.add_argument("--key", default=os.getenv("WS_KEY"))
+    p.add_argument("--symbol", default=os.getenv("WS_SYMBOL", "NASDAQ:SPY"))
+    args = p.parse_args()
+
+    loop = asyncio.get_event_loop()
+
+    # handle ctrl-c
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        try:
+            loop.add_signal_handler(sig, loop.stop)
+        except NotImplementedError:
+            pass
+
+    try:
+        loop.run_until_complete(run(args.ws, args.key, args.symbol))
+    except KeyboardInterrupt:
+        print("Interrupted by user")
+
+if __name__ == '__main__':
+    main()

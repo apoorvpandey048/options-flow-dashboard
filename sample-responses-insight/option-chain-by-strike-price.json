@@ -1,0 +1,90 @@
+{
+    "underlying_code": "NASDAQ:AAPL",
+    "last_update": 1739545440,
+    "data": [
+        {
+            "strike_price": 410,
+            "type": "PUT",
+            "price": 161.2452505,
+            "ask_price": 168.5,
+            "bid_price": 163.5,
+            "delta": -0.8738804,
+            "gamma": 0.0022813,
+            "rho": -8.7563318,
+            "theta": -0.0007591,
+            "vega": 0.7732695,
+            "implied_volatility": 0.2432249,
+            "expiration": 20270617
+        },
+        {
+            "strike_price": 410,
+            "type": "PUT",
+            "price": 160.9497996,
+            "ask_price": 168,
+            "bid_price": 163,
+            "delta": -0.9064876,
+            "gamma": 0.0020403,
+            "rho": -7.3368416,
+            "theta": 0.0007102,
+            "vega": 0.5654851,
+            "implied_volatility": 0.2419025,
+            "expiration": 20270115
+        },
+        {
+            "strike_price": 410,
+            "type": "CALL",
+            "price": 4.5096182,
+            "ask_price": 5.25,
+            "bid_price": 4.45,
+            "delta": 0.1195346,
+            "gamma": 0.0022446,
+            "rho": 0.5769812,
+            "theta": -0.0110679,
+            "vega": 0.7449111,
+            "implied_volatility": 0.2380229,
+            "expiration": 20270617
+        },
+        {
+            "strike_price": 410,
+            "type": "PUT",
+            "price": 160.9845242,
+            "ask_price": 167.65,
+            "bid_price": 164,
+            "delta": -0.9145388,
+            "gamma": 0.0019623,
+            "rho": -7.0784411,
+            "theta": 0.0012772,
+            "vega": 0.5179396,
+            "implied_volatility": 0.2401819,
+            "expiration": 20261218
+        },
+        {
+            "strike_price": 410,
+            "type": "CALL",
+            "price": 3.1338242,
+            "ask_price": 3.2,
+            "bid_price": 3.05,
+            "delta": 0.0933743,
+            "gamma": 0.0020379,
+            "rho": 0.3772916,
+            "theta": -0.0102984,
+            "vega": 0.5644391,
+            "implied_volatility": 0.242113,
+            "expiration": 20270115
+        },
+        {
+            "strike_price": 410,
+            "type": "CALL",
+            "price": 2.7508449,
+            "ask_price": 2.83,
+            "bid_price": 2.7,
+            "delta": 0.0853512,
+            "gamma": 0.0019606,
+            "rho": 0.3331366,
+            "theta": -0.0097401,
+            "vega": 0.5172291,
+            "implied_volatility": 0.2402599,
+            "expiration": 20261218
+        }
+    ]
+}

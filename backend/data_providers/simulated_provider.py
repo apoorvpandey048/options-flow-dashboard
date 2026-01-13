@@ -15,16 +15,12 @@ class SimulatedDataProvider(BaseDataProvider):
     """Provides simulated options data for testing"""
     
     def __init__(self):
+        # Core 4 symbols for monitoring - matching Insight Sentry configuration
         self.base_prices = {
-            'SPY': 662.17,
-            'QQQ': 485.32,
-            'AAPL': 245.18,
-            'MSFT': 425.67,
-            'NVDA': 138.42,
-            'TSLA': 387.91,
-            'META': 612.83,
-            'GOOGL': 178.24,
-            'AMZN': 218.56
+            'SPY': 662.17,    # S&P 500 ETF
+            'QQQ': 485.32,    # NASDAQ 100 ETF
+            'AAPL': 245.18,   # Apple Inc.
+            'TSLA': 387.91    # Tesla Inc.
         }
     
     def get_provider_name(self) -> str:

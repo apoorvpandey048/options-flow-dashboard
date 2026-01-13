@@ -13,7 +13,7 @@ const Home: React.FC = () => {
           </h1>
           <p className="text-xl text-gray-400 max-w-3xl mx-auto">
             Professional-grade options flow analysis with real-time data visualization and
-            advanced strategy backtesting for SPY, QQQ, and major tech stocks.
+            advanced strategy backtesting for SPY, QQQ, AAPL, and TSLA.
           </p>
           <div className="flex gap-4 justify-center mt-8">
             <Link
@@ -89,7 +89,7 @@ const Home: React.FC = () => {
         <div className="mt-12 p-8 bg-gradient-to-r from-blue-900 to-purple-900 rounded-xl border border-blue-700">
           <h3 className="text-2xl font-bold mb-4 text-center">Supported Symbols</h3>
           <div className="flex flex-wrap justify-center gap-4">
-            {['SPY', 'QQQ', 'AAPL', 'MSFT', 'NVDA', 'TSLA', 'META', 'GOOGL', 'AMZN'].map(symbol => (
+            {['SPY', 'QQQ', 'AAPL', 'TSLA'].map(symbol => (
               <span
                 key={symbol}
                 className="px-4 py-2 bg-white bg-opacity-10 rounded-lg font-bold text-lg"

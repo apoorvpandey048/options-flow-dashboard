@@ -9,6 +9,8 @@ from .base_provider import BaseDataProvider
 from .simulated_provider import SimulatedDataProvider
 from .polygon_provider import PolygonDataProvider
 from .massive_provider import MassiveDataProvider
+from .marketstack_provider import MarketStackProvider
+from .insight_sentry_provider import InsightSentryProvider
 
 
 class DataProviderFactory:
@@ -31,16 +33,24 @@ class DataProviderFactory:
         
         # Auto-detect based on API keys
         if provider_type == 'auto':
+            insight_key = os.getenv('INSIGHT_SENTRY_API_KEY')
             massive_key = os.getenv('MASSIVE_API_KEY')
             polygon_key = os.getenv('POLYGON_API_KEY')
             td_key = os.getenv('TD_AMERITRADE_API_KEY')
+            marketstack_key = os.getenv('MARKETSTACK_API_KEY')
             
-            if massive_key:
+            if insight_key:
+                print("✅ Detected Insight Sentry API key - using InsightSentry provider")
+                return InsightSentryProvider(insight_key)
+            elif massive_key:
                 print("✅ Detected Massive API key - using Massive provider")
                 return MassiveDataProvider(massive_key)
             elif polygon_key:
                 print("✅ Detected Polygon.io API key - using Polygon provider")
                 return PolygonDataProvider(polygon_key)
+            elif marketstack_key:
+                print("✅ Detected MarketStack API key - using MarketStack provider")
+                return MarketStackProvider(marketstack_key)
             elif td_key:
                 print("✅ Detected TD Ameritrade API key - using TD provider")
                 # return TDAmeritadeProvider(td_key)  # TODO: Implement
@@ -54,6 +64,14 @@ class DataProviderFactory:
         elif provider_type == 'simulated':
             print("ℹ️  Using simulated data provider")
             return SimulatedDataProvider()
+        
+        elif provider_type == 'insight_sentry':
+            api_key = os.getenv('INSIGHT_SENTRY_API_KEY')
+            if not api_key:
+                print("⚠️  No Insight Sentry API key found, falling back to simulated")
+                return SimulatedDataProvider()
+            print("✅ Using Insight Sentry data provider")
+            return InsightSentryProvider(api_key)
         
         elif provider_type == 'massive':
             api_key = os.getenv('MASSIVE_API_KEY')
@@ -82,4 +100,4 @@ class DataProviderFactory:
     @staticmethod
     def get_available_providers() -> list:
         """Get list of available provider types"""
-        return ['simulated', 'massive', 'polygon', 'td_ameritrade']
+        return ['simulated', 'insight_sentry', 'massive', 'polygon', 'marketstack', 'td_ameritrade']
