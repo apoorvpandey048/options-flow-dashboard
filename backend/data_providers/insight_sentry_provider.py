@@ -13,20 +13,24 @@ Ultra Plan features:
 from typing import Dict, List, Optional, Any
 import requests
 import time
+import asyncio
+import threading
 from datetime import datetime, timedelta
 from .base_provider import BaseDataProvider
+from .insight_sentry_websocket import InsightSentryWebSocket
 
 class InsightSentryProvider(BaseDataProvider):
     """Insight Sentry API provider for options data"""
     
     BASE_URL = "https://api.insightsentry.com"
     
-    def __init__(self, api_key: str):
+    def __init__(self, api_key: str, use_websocket: bool = True):
         """
         Initialize Insight Sentry provider
         
         Args:
             api_key: Insight Sentry API key
+            use_websocket: Whether to use WebSocket for real-time data (default: True)
         """
         self.name = "InsightSentry"
         self.api_key = api_key
@@ -37,6 +41,80 @@ class InsightSentryProvider(BaseDataProvider):
         self.request_count = 0
         self.minute_start = time.time()
         self.max_requests_per_minute = 30  # Safety margin (limit is 35)
+        
+        # WebSocket support
+        self.use_websocket = use_websocket
+        self.ws_client = None
+        self.ws_loop = None
+        self.ws_thread = None
+        self.ws_data_cache = {}  # Cache for WebSocket data by symbol
+        
+        if self.use_websocket:
+            self._start_websocket()
+    
+    def _start_websocket(self):
+        """Start WebSocket client in background thread"""
+        try:
+            print("Starting Insight Sentry WebSocket client...")
+            
+            # Create WebSocket client with callback
+            self.ws_client = InsightSentryWebSocket(
+                rest_api_key=self.api_key,
+                callback=self._ws_data_callback
+            )
+            
+            # Start WebSocket in a new thread with its own event loop
+            self.ws_thread = threading.Thread(target=self._run_websocket, daemon=True)
+            self.ws_thread.start()
+            
+            print("WebSocket client started successfully")
+        except Exception as e:
+            print(f"Failed to start WebSocket: {e}")
+            self.use_websocket = False
+    
+    def _run_websocket(self):
+        """Run WebSocket in separate thread with its own event loop"""
+        try:
+            # Create new event loop for this thread
+            self.ws_loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(self.ws_loop)
+            
+            # Run WebSocket connection
+            self.ws_loop.run_until_complete(self.ws_client.connect())
+        except Exception as e:
+            print(f"WebSocket thread error: {e}")
+        finally:
+            if self.ws_loop:
+                self.ws_loop.close()
+    
+    async def _ws_data_callback(self, symbol: str, data: Dict):
+        """
+        Callback for WebSocket data updates
+        
+        Args:
+            symbol: Symbol code (e.g., "NASDAQ:AAPL")
+            data: Updated data for the symbol
+        """
+        # Store in cache
+        self.ws_data_cache[symbol] = data
+        print(f"WS Update: {symbol} - Price: {data.get('last_price')}, Volume: {data.get('volume')}")
+    
+    def _subscribe_symbols_ws(self, symbols: List[str]):
+        """
+        Subscribe to symbols via WebSocket
+        
+        Args:
+            symbols: List of symbols to subscribe (e.g., ["NASDAQ:AAPL", "AMEX:SPY"])
+        """
+        if not self.use_websocket or not self.ws_client:
+            return
+        
+        # Convert to Insight Sentry format if needed
+        formatted_symbols = [self._convert_symbol_to_insight(s) for s in symbols]
+        
+        # Subscribe
+        self.ws_client.subscribe_symbols(formatted_symbols)
+        print(f"Subscribed to {len(formatted_symbols)} symbols via WebSocket")
     
     def _rate_limit_check(self):
         """Check and enforce rate limits (35 requests per minute)"""
@@ -532,7 +610,8 @@ class InsightSentryProvider(BaseDataProvider):
     
     def get_options_flow_data(self, symbol: str, timeframe: str = '5min', replay_date: str = None, replay_time: str = None) -> Dict:
         """
-        Get options flow data for specified timeframe using REAL VOLUMES from series endpoint
+        Get options flow data for specified timeframe using REAL VOLUMES
+        Uses WebSocket data when available, falls back to REST API
         
         Args:
             symbol: Stock symbol
@@ -542,10 +621,28 @@ class InsightSentryProvider(BaseDataProvider):
             Dictionary with call/put volumes, ratios, strikes, etc.
         """
         insight_symbol = self._convert_symbol_to_insight(symbol)
+        
+        # Subscribe to this symbol via WebSocket if enabled
+        if self.use_websocket and self.ws_client:
+            # Make sure we're subscribed to this symbol
+            self._subscribe_symbols_ws([symbol])
+            
+            # Give WebSocket a moment to start if it's new
+            time.sleep(0.5)
 
-        # Current stock price
-        current_price = float(self.get_stock_price(symbol) or 0.0)
-        print(f"[InsightSentry] get_options_flow_data: symbol={symbol} current_price={current_price} timeframe={timeframe}")
+        # Current stock price - try WebSocket cache first
+        current_price = 0.0
+        if self.use_websocket and insight_symbol in self.ws_data_cache:
+            ws_data = self.ws_data_cache[insight_symbol]
+            current_price = float(ws_data.get('last_price', 0) or 0)
+            print(f"[InsightSentry] Using WebSocket price for {symbol}: {current_price}")
+        
+        # Fall back to REST API if no WebSocket data
+        if not current_price:
+            current_price = float(self.get_stock_price(symbol) or 0.0)
+            print(f"[InsightSentry] Using REST API price for {symbol}: {current_price}")
+        
+        print(f"[InsightSentry] get_options_flow_data: symbol={symbol} current_price={current_price} timeframe={timeframe} ws_enabled={self.use_websocket}")
 
         # Try to get structured option chain by expiration (preferred)
         info = self.get_symbol_info(symbol)
