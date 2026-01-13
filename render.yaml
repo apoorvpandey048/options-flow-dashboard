@@ -6,7 +6,7 @@ services:
     region: oregon
     plan: free
     buildCommand: "pip install -r backend/requirements.txt"
-    startCommand: "cd backend && python app.py"
+    startCommand: "cd backend && gunicorn -k eventlet -w 1 app:app"
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.0
@@ -14,8 +14,7 @@ services:
         generateValue: true
       - key: FLASK_ENV
         value: production
-      - key: DATA_PROVIDER
-        value: simulated
+      # DATA_PROVIDER intentionally unset here so runtime env controls provider selection
       - key: ALLOWED_ORIGINS
         sync: false
     healthCheckPath: /api/health

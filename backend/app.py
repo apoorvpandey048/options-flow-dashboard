@@ -22,7 +22,15 @@ app.config['SECRET_KEY'] = Config.SECRET_KEY
 # CORS - only allow frontend origin for security
 allowed_origins = os.getenv('ALLOWED_ORIGINS', 'http://localhost:3000').split(',')
 CORS(app, resources={r"/*": {"origins": allowed_origins}})
-socketio = SocketIO(app, cors_allowed_origins=allowed_origins, async_mode='threading')
+# Prefer an async mode that supports WebSockets in production (eventlet/gevent)
+try:
+    import eventlet  # type: ignore
+    async_mode = 'eventlet'
+except Exception:
+    async_mode = None
+
+# Create SocketIO server; allow SocketIO extension to auto-select best async mode if not specified
+socketio = SocketIO(app, cors_allowed_origins=allowed_origins, async_mode=async_mode)
 
 # Global state
 active_connections = set()
