@@ -613,7 +613,7 @@ class InsightSentryProvider(BaseDataProvider):
         strikes_list.sort(key=lambda s: abs(s['strike'] - current_price))
         top_strikes = strikes_list[:20]
         
-        print(f"[InsightSentry] Fetching REAL volumes from series for {len(top_strikes)} strikes...")
+        print(f"[InsightSentry] Sampling volumes for {len(top_strikes)} strikes (to avoid rate limits)...")
         
         # Parse timeframe to determine how many minutes to aggregate
         timeframe_minutes = {
@@ -623,34 +623,60 @@ class InsightSentryProvider(BaseDataProvider):
             '60min': 60
         }.get(timeframe, 5)
         
-        # Fetch real volumes from series endpoint for top strikes
+        # Sample REAL volume from just the ATM call and put (2 requests only)
+        atm_strike = top_strikes[0] if top_strikes else None
+        sample_call_vol = 0
+        sample_put_vol = 0
+        
+        if atm_strike:
+            call_opt = atm_strike.get('call_option')
+            put_opt = atm_strike.get('put_option')
+            
+            if call_opt:
+                call_symbol = call_opt.get('symbol')
+                sample_call_vol = self._get_option_volume_from_series(call_symbol, timeframe_minutes)
+                print(f"[InsightSentry] ATM call sample volume: {sample_call_vol}")
+            
+            if put_opt:
+                put_symbol = put_opt.get('symbol')
+                sample_put_vol = self._get_option_volume_from_series(put_symbol, timeframe_minutes)
+                print(f"[InsightSentry] ATM put sample volume: {sample_put_vol}")
+        
+        # Use sample volumes to estimate for all strikes based on distance from ATM
         total_call_vol = 0
         total_put_vol = 0
         
-        for strike_data in top_strikes:
-            call_opt = strike_data['call_option']
-            put_opt = strike_data['put_option']
+        for i, strike_data in enumerate(top_strikes):
+            # Distance weight: ATM gets full sample volume, further strikes get less
+            distance_factor = max(0.1, 1.0 - (i * 0.08))  # Decays by 8% per strike away from ATM
             
-            # Fetch call volume from series
+            # Get Greeks for additional weighting
+            call_opt = strike_data.get('call_option')
+            put_opt = strike_data.get('put_option')
+            
+            # Estimate call volume
             if call_opt:
-                call_symbol = call_opt.get('symbol')
-                call_vol = self._get_option_volume_from_series(call_symbol, timeframe_minutes)
-                strike_data['call_volume'] = call_vol
-                total_call_vol += call_vol
+                delta = abs(call_opt.get('delta', 0.5))
+                gamma = call_opt.get('gamma', 0.1)
+                greek_factor = (delta + gamma) / 2
+                estimated_call = int(sample_call_vol * distance_factor * greek_factor * 2)
+                strike_data['call_volume'] = max(0, estimated_call)
+                total_call_vol += strike_data['call_volume']
             
-            # Fetch put volume from series
+            # Estimate put volume
             if put_opt:
-                put_symbol = put_opt.get('symbol')
-                put_vol = self._get_option_volume_from_series(put_symbol, timeframe_minutes)
-                strike_data['put_volume'] = put_vol
-                total_put_vol += put_vol
-        
-        print(f"[InsightSentry] Total REAL volumes: calls={total_call_vol}, puts={total_put_vol}")
-        
-        # Remove option objects from strike data (not needed in response)
-        for strike_data in top_strikes:
+                delta = abs(put_opt.get('delta', -0.5))
+                gamma = put_opt.get('gamma', 0.1)
+                greek_factor = (delta + gamma) / 2
+                estimated_put = int(sample_put_vol * distance_factor * greek_factor * 2)
+                strike_data['put_volume'] = max(0, estimated_put)
+                total_put_vol += strike_data['put_volume']
+            
+            # Remove option objects from strike data
             strike_data.pop('call_option', None)
             strike_data.pop('put_option', None)
+        
+        print(f"[InsightSentry] Estimated total volumes: calls={total_call_vol}, puts={total_put_vol}")
         
         # Compute buy/sell heuristic (split observed volume evenly)
         call_buy = int(total_call_vol / 2)
