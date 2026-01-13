@@ -168,6 +168,26 @@ def debug_provider():
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/debug/raw-options/<symbol>', methods=['GET'])
+def debug_raw_options(symbol):
+    """Return raw option entries from the provider for inspection (debug only)."""
+    if symbol not in Config.SYMBOLS:
+        return jsonify({'error': 'Invalid symbol'}), 400
+
+    try:
+        # Request fresh data bypassing cache by passing replay flags (None) and directly calling provider
+        flow = data_fetcher.provider.get_options_flow_data(symbol, timeframe='5min')
+        raw = flow.get('raw_options') if isinstance(flow, dict) else None
+        if raw is None:
+            # fallback: try provider.get_options_chain
+            raw_chain = data_fetcher.provider.get_options_chain(symbol)
+            return jsonify({'raw_options': raw_chain[:200], 'source': 'chain'}), 200
+
+        return jsonify({'raw_options': raw[:200], 'source': 'flow'}), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/api/monitor/<symbol>/strikes', methods=['GET'])
 def get_strike_analysis(symbol):
     """Get detailed strike-level analysis"""
