@@ -17,7 +17,8 @@ class Config:
     POLYGON_API_KEY = os.getenv('POLYGON_API_KEY', '')
     ALPHA_VANTAGE_API_KEY = os.getenv('ALPHA_VANTAGE_API_KEY', '')
     MARKETSTACK_API_KEY = os.getenv('MARKETSTACK_API_KEY', '')
-    INSIGHT_SENTRY_API_KEY = os.getenv('INSIGHT_SENTRY_API_KEY', 'eyJhbGciOiJIUzI1NiJ9.eyJ1dWlkIjoiYXdlc29tZWJsb2dzMjAxMEBnbWFpbC5jb20iLCJwbGFuIjoidWx0cmEiLCJuZXdzZmVlZF9lbmFibGVkIjp0cnVlLCJ3ZWJzb2NrZXRfc3ltYm9scyI6NSwid2Vic29ja2V0X2Nvbm5lY3Rpb25zIjoxfQ.zfYCHDg7v1O3Bkb6_JLlus90FtBUfcRH_Px6_sut-Ks')
+    # Load Insight Sentry API key from environment; do NOT hardcode keys in source.
+    INSIGHT_SENTRY_API_KEY = os.getenv('INSIGHT_SENTRY_API_KEY', '')
     
     # Options data settings - Using Insight Sentry API
     SYMBOLS = ['SPY', 'QQQ', 'AAPL', 'TSLA']  # Core 4 symbols for monitoring

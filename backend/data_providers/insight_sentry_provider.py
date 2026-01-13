@@ -248,7 +248,8 @@ class InsightSentryProvider(BaseDataProvider):
                     'ask': opt.get('ask_price'),
                     'last': opt.get('theoretical_price'),
                     'volume': opt.get('volume'),
-                    'open_interest': None,  # Not provided by this endpoint
+                    # Try common keys for open interest if present
+                    'open_interest': opt.get('open_interest') or opt.get('oi') or opt.get('openInt') or None,
                     'implied_volatility': opt.get('implied_volatility'),
                     'delta': opt.get('delta'),
                     'gamma': opt.get('gamma'),
@@ -315,7 +316,8 @@ class InsightSentryProvider(BaseDataProvider):
                 'ask': quote.get('ask'),
                 'last': quote.get('last_price'),
                 'volume': quote.get('volume'),
-                'open_interest': None,
+                # Try common keys for open interest if present in quote payload
+                'open_interest': quote.get('open_interest') or quote.get('oi') or quote.get('openInt') or None,
                 'implied_volatility': None,
                 'delta': None,
                 'gamma': None,
@@ -550,7 +552,16 @@ class InsightSentryProvider(BaseDataProvider):
             if strike is None:
                 continue
             typ = (opt.get('type') or '').lower()
-            vol = int(opt.get('volume') or 0)
+            # Prefer explicit volume; fall back to last trade size or open interest when volume missing
+            vol_raw = opt.get('volume') or opt.get('last_size') or opt.get('open_interest') or opt.get('oi') or 0
+            try:
+                vol = int(float(vol_raw))
+            except Exception:
+                vol = 0
+
+            # Log when we used a fallback (helps debug why volumes are zero)
+            if not opt.get('volume') and vol > 0:
+                print(f"[InsightSentry] Using fallback volume for strike={strike} type={typ} vol={vol}")
 
             if strike not in strike_map:
                 strike_map[strike] = {
