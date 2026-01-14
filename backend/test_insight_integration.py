@@ -4,8 +4,8 @@ Test Insight Sentry Provider Integration
 import sys
 import os
 
-# Set the API key explicitly for testing
-os.environ['INSIGHT_SENTRY_API_KEY'] = 'eyJhbGciOiJIUzI1NiJ9.eyJ1dWlkIjoiYXdlc29tZWJsb2dzMjAxMEBnbWFpbC5jb20iLCJwbGFuIjoidWx0cmEiLCJuZXdzZmVlZF9lbmFibGVkIjp0cnVlLCJ3ZWJzb2NrZXRfc3ltYm9scyI6NSwid2Vic29ja2V0X2Nvbm5lY3Rpb25zIjoxfQ.zfYCHDg7v1O3Bkb6_JLlus90FtBUfcRH_Px6_sut-Ks'
+# The test expects `INSIGHT_SENTRY_API_KEY` to be provided via environment variables
+# Do NOT hardcode API keys in source. Set the key in your environment or CI job before running tests.
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
