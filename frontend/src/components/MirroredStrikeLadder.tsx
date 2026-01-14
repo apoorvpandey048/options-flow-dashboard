@@ -52,7 +52,7 @@ const MirroredStrikeLadder: React.FC<MirroredStrikeLadderProps> = ({
   // Ensure we always show windowSize * 2 + 1 strikes (median + above + below)
   const startIdx = Math.max(0, closestStrikeIndex - windowSize);
   const endIdx = Math.min(sortedStrikes.length, closestStrikeIndex + windowSize + 1);
-  const visibleStrikes = sortedStrikes.slice(startIdx, endIdx);
+  const visibleStrikes = sortedStrikes.slice(startIdx, endIdx).reverse(); // Reverse to show high strikes at top
   
   // Find median index in visible strikes
   const medianIndexInVisible = visibleStrikes.findIndex(s => {
