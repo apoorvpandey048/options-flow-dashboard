@@ -20,4 +20,8 @@ Write-Host "Make sure backend is running on port 5000" -ForegroundColor Yellow
 Write-Host "Press Ctrl+C to stop the server" -ForegroundColor Yellow
 Write-Host ""
 
+# Ensure the frontend dev server points to the correct backend URL
+$env:REACT_APP_API_URL = 'http://localhost:10000'
+$env:REACT_APP_WS_URL = 'http://localhost:10000'
+
 npm start

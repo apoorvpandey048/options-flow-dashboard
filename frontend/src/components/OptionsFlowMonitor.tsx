@@ -263,6 +263,11 @@ const OptionsFlowMonitor: React.FC = () => {
             putsTotal={puts.total}
             callRatio={calls.ratio}
             putRatio={puts.ratio}
+            callsBuy={calls.buy}
+            callsSell={calls.sell}
+            putsBuy={puts.buy}
+            putsSell={puts.sell}
+            putCallRatio={put_call_ratio}
             timestamp={dataMode === 'historical' && selectedDate 
               ? `${selectedDate} ${replayTime}:00` 
               : new Date().toISOString()}

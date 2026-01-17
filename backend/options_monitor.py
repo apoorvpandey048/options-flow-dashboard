@@ -41,6 +41,7 @@ class OptionsFlowMonitor:
             'sentiment': self._calculate_sentiment(flow_data),
             'strikes': flow_data['strikes']
             ,
+            'estimation_coverage': flow_data.get('estimation_coverage', None),
             'debug_provider': self.data_fetcher.provider.get_provider_name() if hasattr(self.data_fetcher, 'provider') else None,
             'debug_provider_class': self.data_fetcher.provider.__class__.__name__ if hasattr(self.data_fetcher, 'provider') else None
         }

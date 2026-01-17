@@ -9,6 +9,11 @@ interface MirroredStrikeLadderProps {
   putsTotal: number;
   callRatio: number;
   putRatio: number;
+  callsBuy?: number;
+  callsSell?: number;
+  putsBuy?: number;
+  putsSell?: number;
+  putCallRatio?: number;
   timestamp: string;
   width?: number;
   heightPerRow?: number;
@@ -33,6 +38,11 @@ const MirroredStrikeLadder: React.FC<MirroredStrikeLadderProps> = ({
   putsTotal,
   callRatio,
   putRatio,
+  callsBuy,
+  callsSell,
+  putsBuy,
+  putsSell,
+  putCallRatio: backendPutCallRatio,
   timestamp,
   width = 1200,
   heightPerRow = 18,
@@ -85,16 +95,17 @@ const MirroredStrikeLadder: React.FC<MirroredStrikeLadderProps> = ({
   const barAreaWidth = (width / 2) - 100; // 100px for labels and padding
   const scale = (volume: number) => (volume / maxVolume) * barAreaWidth;
 
-  // Calculate Buy/Sell for calls and puts (simplified - using ratio as proxy)
-  const callsBuy = Math.round(callsTotal * callRatio / (1 + callRatio));
-  const callsSell = callsTotal - callsBuy;
-  const putsBuy = Math.round(putsTotal * putRatio / (1 + putRatio));
-  const putsSell = putsTotal - putsBuy;
+  // Use backend-provided buy/sell if available, otherwise fall back to previous heuristic
+  const callsBuyVal = typeof callsBuy === 'number' ? callsBuy : Math.round(callsTotal * callRatio / (1 + callRatio));
+  const callsSellVal = typeof callsSell === 'number' ? callsSell : callsTotal - callsBuyVal;
+  const putsBuyVal = typeof putsBuy === 'number' ? putsBuy : Math.round(putsTotal * putRatio / (1 + putRatio));
+  const putsSellVal = typeof putsSell === 'number' ? putsSell : putsTotal - putsBuyVal;
 
   // Determine overall sentiment from put/call ratio
-  const putCallRatio = putsTotal / (callsTotal || 1);
-  const sentiment = putCallRatio > 1.2 ? 'Bearish' : putCallRatio < 0.8 ? 'Bullish' : 'Neutral';
-  const sentimentColor = putCallRatio > 1.2 ? '#ef4444' : putCallRatio < 0.8 ? '#16a34a' : '#fbbf24';
+  // Prefer backend overall ratio if provided (renamed earlier to avoid shadowing)
+  const putCallRatioVal = typeof backendPutCallRatio === 'number' ? backendPutCallRatio : putsTotal / (callsTotal || 1);
+  const sentiment = putCallRatioVal > 1.2 ? 'Bearish' : putCallRatioVal < 0.8 ? 'Bullish' : 'Neutral';
+  const sentimentColor = putCallRatioVal > 1.2 ? '#ef4444' : putCallRatioVal < 0.8 ? '#16a34a' : '#fbbf24';
 
   // Calculate buy/sell split for each strike
   const getStrikeBuySell = (volume: number, ratio: number) => {
@@ -182,7 +193,7 @@ const MirroredStrikeLadder: React.FC<MirroredStrikeLadderProps> = ({
           fontSize="12"
           fontWeight="bold"
         >
-          P/C: {putCallRatio.toFixed(2)}
+          P/C: {putCallRatioVal.toFixed(3)}
         </text>
         
         <text
@@ -219,20 +230,20 @@ const MirroredStrikeLadder: React.FC<MirroredStrikeLadderProps> = ({
           Buy
         </text>
         <text x={200} y={52} fill="#16a34a" fontSize="14" fontWeight="bold">
-          {callsBuy.toLocaleString()}
+          {callsBuyVal?.toLocaleString()}
         </text>
         
         <text x={280} y={35} fill="#9ca3af" fontSize="12">
           Sell
         </text>
         <text x={280} y={52} fill="#ef4444" fontSize="14" fontWeight="bold">
-          {callsSell.toLocaleString()}
+          {callsSellVal?.toLocaleString()}
         </text>
         
         {/* Ratio Box */}
         <rect x={200} y={60} width={120} height={26} fill="#1f2937" stroke="#16a34a" strokeWidth="1.5" rx="4" />
         <text x={260} y={77} fill="#16a34a" fontSize="13" fontWeight="bold" textAnchor="middle">
-          Ratio: {callRatio.toFixed(4)}
+          Ratio: {callRatio.toFixed(3)}
         </text>
       </g>
 
@@ -250,20 +261,20 @@ const MirroredStrikeLadder: React.FC<MirroredStrikeLadderProps> = ({
           Buy
         </text>
         <text x={width - 280} y={52} fill="#16a34a" fontSize="14" fontWeight="bold" textAnchor="end">
-          {putsBuy.toLocaleString()}
+          {putsBuyVal?.toLocaleString()}
         </text>
         
         <text x={width - 200} y={35} fill="#9ca3af" fontSize="12" textAnchor="end">
           Sell
         </text>
         <text x={width - 200} y={52} fill="#ef4444" fontSize="14" fontWeight="bold" textAnchor="end">
-          {putsSell.toLocaleString()}
+          {putsSellVal?.toLocaleString()}
         </text>
         
         {/* Ratio Box */}
         <rect x={width - 320} y={60} width={120} height={26} fill="#1f2937" stroke="#ef4444" strokeWidth="1.5" rx="4" />
         <text x={width - 260} y={77} fill="#ef4444" fontSize="13" fontWeight="bold" textAnchor="middle">
-          Ratio: {putRatio.toFixed(4)}
+          Ratio: {putRatio.toFixed(3)}
         </text>
       </g>
 
@@ -275,9 +286,14 @@ const MirroredStrikeLadder: React.FC<MirroredStrikeLadderProps> = ({
         const isMedian = idx === medianIndexInVisible;
         const isNearPrice = Math.abs(strike.strike - currentPrice) < 2.5;
 
-        // Calculate buy/sell portions for this strike
-        const callSplit = getStrikeBuySell(strike.call_volume, callRatio);
-        const putSplit = getStrikeBuySell(strike.put_volume, putRatio);
+        // Calculate buy/sell portions for this strike - prefer per-strike values if provider returned them
+        const callSplit = (typeof (strike as any).call_buy === 'number' && typeof (strike as any).call_sell === 'number')
+          ? { buy: (strike as any).call_buy, sell: (strike as any).call_sell }
+          : getStrikeBuySell(strike.call_volume, callRatio);
+
+        const putSplit = (typeof (strike as any).put_buy === 'number' && typeof (strike as any).put_sell === 'number')
+          ? { buy: (strike as any).put_buy, sell: (strike as any).put_sell }
+          : getStrikeBuySell(strike.put_volume, putRatio);
         const callBuyWidth = callWidth * (callSplit.buy / (strike.call_volume || 1));
         const callSellWidth = callWidth * (callSplit.sell / (strike.call_volume || 1));
         const putBuyWidth = putWidth * (putSplit.buy / (strike.put_volume || 1));

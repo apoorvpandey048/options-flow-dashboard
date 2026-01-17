@@ -710,6 +710,28 @@ class InsightSentryProvider(BaseDataProvider):
         strikes_list.sort(key=lambda s: abs(s['strike'] - current_price))
         top_strikes = strikes_list[:20]
         
+        # If WebSocket is enabled, proactively subscribe to option symbols for the top strikes
+        # so we can get quote/last_price context used to infer aggressor side more accurately.
+        if self.use_websocket and self.ws_client:
+            try:
+                option_codes = []
+                for s in top_strikes:
+                    co = s.get('call_option')
+                    po = s.get('put_option')
+                    if co and co.get('symbol'):
+                        option_codes.append(co.get('symbol'))
+                    if po and po.get('symbol'):
+                        option_codes.append(po.get('symbol'))
+
+                # Subscribe in batches to avoid huge single messages
+                if option_codes:
+                    # Use the websocket client's subscribe method which expects Insight-formatted codes
+                    self.ws_client.subscribe_symbols(option_codes)
+                    # Give websocket a moment to populate cache
+                    time.sleep(0.6)
+            except Exception:
+                pass
+
         print(f"[InsightSentry] Sampling volumes for {len(top_strikes)} strikes (to avoid rate limits)...")
         
         # Parse timeframe to determine how many minutes to aggregate
@@ -726,23 +748,53 @@ class InsightSentryProvider(BaseDataProvider):
         sample_put_vol = 0
         
         if atm_strike:
-            call_opt = atm_strike.get('call_option')
-            put_opt = atm_strike.get('put_option')
-            
-            if call_opt:
-                call_symbol = call_opt.get('symbol')
-                sample_call_vol = self._get_option_volume_from_series(call_symbol, timeframe_minutes)
-                print(f"[InsightSentry] ATM call sample volume: {sample_call_vol}")
-            
-            if put_opt:
-                put_symbol = put_opt.get('symbol')
-                sample_put_vol = self._get_option_volume_from_series(put_symbol, timeframe_minutes)
-                print(f"[InsightSentry] ATM put sample volume: {sample_put_vol}")
+            # Sample series volumes for multiple nearby strikes (ATM +/- 2) to get a better volume basis
+            max_samples = 3
+            sample_call_vol = 0
+            sample_put_vol = 0
+            sampled_call_symbols = []
+            sampled_put_symbols = []
+
+            for j in range(min(max_samples, len(top_strikes))):
+                s = top_strikes[j]
+                co = s.get('call_option')
+                po = s.get('put_option')
+                if co and co.get('symbol'):
+                    sampled_call_symbols.append(co.get('symbol'))
+                if po and po.get('symbol'):
+                    sampled_put_symbols.append(po.get('symbol'))
+
+            # Aggregate real traded volume for sampled option symbols (conservative number to avoid rate limits)
+            for sym in sampled_call_symbols:
+                try:
+                    v = self._get_option_volume_from_series(sym, timeframe_minutes)
+                    sample_call_vol += int(v)
+                except Exception:
+                    pass
+
+            for sym in sampled_put_symbols:
+                try:
+                    v = self._get_option_volume_from_series(sym, timeframe_minutes)
+                    sample_put_vol += int(v)
+                except Exception:
+                    pass
+
+            # If we collected multiple samples, keep the sum as representative
+            if sample_call_vol > 0:
+                print(f"[InsightSentry] Sampled call volumes ({len(sampled_call_symbols)}): {sample_call_vol}")
+            if sample_put_vol > 0:
+                print(f"[InsightSentry] Sampled put volumes ({len(sampled_put_symbols)}): {sample_put_vol}")
         
         # Use sample volumes to estimate for all strikes based on distance from ATM
         total_call_vol = 0
         total_put_vol = 0
-        
+        total_call_buy = 0.0
+        total_call_sell = 0.0
+        total_put_buy = 0.0
+        total_put_sell = 0.0
+        covered_call_vol = 0.0
+        covered_put_vol = 0.0
+
         for i, strike_data in enumerate(top_strikes):
             # Distance weight: ATM gets full sample volume, further strikes get less
             distance_factor = max(0.1, 1.0 - (i * 0.08))  # Decays by 8% per strike away from ATM
@@ -753,33 +805,198 @@ class InsightSentryProvider(BaseDataProvider):
             
             # Estimate call volume
             if call_opt:
-                delta = abs(call_opt.get('delta', 0.5))
-                gamma = call_opt.get('gamma', 0.1)
-                greek_factor = (delta + gamma) / 2
-                estimated_call = int(sample_call_vol * distance_factor * greek_factor * 2)
-                strike_data['call_volume'] = max(0, estimated_call)
+                # Prefer any reported volume from the option quote/chain if available
+                reported_vol = call_opt.get('volume') or call_opt.get('last_volume') or 0
+                if reported_vol and reported_vol > 0:
+                    strike_volume = int(reported_vol)
+                    # mark as covered by reported data
+                    covered_call_vol += float(strike_volume)
+                else:
+                    delta = abs(call_opt.get('delta', 0.5))
+                    gamma = call_opt.get('gamma', 0.1)
+                    greek_factor = (delta + gamma) / 2
+                    estimated_call = int(sample_call_vol * distance_factor * greek_factor * 2)
+                    strike_volume = max(0, estimated_call)
+
+                strike_data['call_volume'] = strike_volume
+
+                # Infer aggressor side when WebSocket quote available for this option symbol
+                call_buy = 0
+                call_sell = strike_data['call_volume']
+                try:
+                    call_symbol = call_opt.get('symbol')
+                    ws_quote = None
+                    if self.use_websocket and call_symbol and call_symbol in self.ws_data_cache:
+                        ws_quote = self.ws_data_cache.get(call_symbol)
+
+                        if ws_quote:
+                            bid = float(ws_quote.get('bid') or 0)
+                            ask = float(ws_quote.get('ask') or 0)
+                            last = float(ws_quote.get('last_price') or 0)
+                            bid_size = int(ws_quote.get('bid_size') or 0)
+                            ask_size = int(ws_quote.get('ask_size') or 0)
+
+                            if ask > bid and last:
+                                mid = (bid + ask) / 2.0
+                                rel = (last - mid) / (ask - bid)
+                                # rel in [-1,1] roughly; convert to buy fraction in [0.15,0.85]
+                                buy_frac = 0.5 + 0.5 * max(-1.0, min(1.0, rel))
+                                buy_frac = max(0.15, min(0.85, buy_frac))
+                            elif bid_size + ask_size > 0:
+                                # Use order book sizes as secondary signal (buyers vs sellers)
+                                size_ratio = (bid_size - ask_size) / float(max(1, bid_size + ask_size))
+                                buy_frac = 0.5 + 0.4 * max(-1.0, min(1.0, size_ratio))
+                                buy_frac = max(0.1, min(0.9, buy_frac))
+                            else:
+                                # Fallback: even split
+                                buy_frac = 0.5
+
+                            call_buy_f = strike_data['call_volume'] * buy_frac
+                            call_sell_f = strike_data['call_volume'] - call_buy_f
+                            call_buy = int(round(call_buy_f))
+                            call_sell = int(round(call_sell_f))
+                            # If we used WS quote to infer side, mark this strike as covered
+                            covered_call_vol += float(strike_data['call_volume'])
+                    else:
+                            # No WS quote - fallback to even split (previous heuristic)
+                            call_buy_f = strike_data['call_volume'] * 0.5
+                            call_sell_f = strike_data['call_volume'] - call_buy_f
+                            call_buy = int(round(call_buy_f))
+                            call_sell = int(round(call_sell_f))
+                except Exception:
+                    call_buy = int(strike_data['call_volume'] * 0.5)
+                    call_sell = strike_data['call_volume'] - call_buy
+
+                strike_data['call_buy'] = call_buy
+                strike_data['call_sell'] = call_sell
                 total_call_vol += strike_data['call_volume']
+                # accumulate floats to avoid per-strike rounding canceling out
+                total_call_buy += float(call_buy_f if 'call_buy_f' in locals() else call_buy)
+                total_call_sell += float(call_sell_f if 'call_sell_f' in locals() else call_sell)
             
             # Estimate put volume
             if put_opt:
-                delta = abs(put_opt.get('delta', -0.5))
-                gamma = put_opt.get('gamma', 0.1)
-                greek_factor = (delta + gamma) / 2
-                estimated_put = int(sample_put_vol * distance_factor * greek_factor * 2)
-                strike_data['put_volume'] = max(0, estimated_put)
+                reported_vol = put_opt.get('volume') or put_opt.get('last_volume') or 0
+                if reported_vol and reported_vol > 0:
+                    strike_volume = int(reported_vol)
+                    # mark as covered by reported data
+                    covered_put_vol += float(strike_volume)
+                else:
+                    delta = abs(put_opt.get('delta', -0.5))
+                    gamma = put_opt.get('gamma', 0.1)
+                    greek_factor = (delta + gamma) / 2
+                    estimated_put = int(sample_put_vol * distance_factor * greek_factor * 2)
+                    strike_volume = max(0, estimated_put)
+
+                strike_data['put_volume'] = strike_volume
+
+                # Infer aggressor side when WebSocket quote available for this option symbol
+                put_buy = 0
+                put_sell = strike_data['put_volume']
+                try:
+                    put_symbol = put_opt.get('symbol')
+                    ws_quote = None
+                    if self.use_websocket and put_symbol and put_symbol in self.ws_data_cache:
+                        ws_quote = self.ws_data_cache.get(put_symbol)
+
+                    if ws_quote:
+                        bid = float(ws_quote.get('bid') or 0)
+                        ask = float(ws_quote.get('ask') or 0)
+                        last = float(ws_quote.get('last_price') or 0)
+                        bid_size = int(ws_quote.get('bid_size') or 0)
+                        ask_size = int(ws_quote.get('ask_size') or 0)
+
+                        if ask > bid and last:
+                            mid = (bid + ask) / 2.0
+                            rel = (last - mid) / (ask - bid)
+                            buy_frac = 0.5 + 0.5 * max(-1.0, min(1.0, rel))
+                            buy_frac = max(0.15, min(0.85, buy_frac))
+                        elif bid_size + ask_size > 0:
+                            size_ratio = (bid_size - ask_size) / float(max(1, bid_size + ask_size))
+                            buy_frac = 0.5 + 0.4 * max(-1.0, min(1.0, size_ratio))
+                            buy_frac = max(0.1, min(0.9, buy_frac))
+                        else:
+                            buy_frac = 0.5
+
+                        put_buy_f = strike_data['put_volume'] * buy_frac
+                        put_sell_f = strike_data['put_volume'] - put_buy_f
+                        put_buy = int(round(put_buy_f))
+                        put_sell = int(round(put_sell_f))
+                        # If we used WS quote to infer side, mark this strike as covered
+                        covered_put_vol += float(strike_data['put_volume'])
+                    else:
+                        put_buy_f = strike_data['put_volume'] * 0.5
+                        put_sell_f = strike_data['put_volume'] - put_buy_f
+                        put_buy = int(round(put_buy_f))
+                        put_sell = int(round(put_sell_f))
+                except Exception:
+                    put_buy_f = strike_data['put_volume'] * 0.5
+                    put_sell_f = strike_data['put_volume'] - put_buy_f
+                    put_buy = int(round(put_buy_f))
+                    put_sell = int(round(put_sell_f))
+
+                strike_data['put_buy'] = put_buy
+                strike_data['put_sell'] = put_sell
                 total_put_vol += strike_data['put_volume']
+                total_put_buy += float(put_buy_f if 'put_buy_f' in locals() else put_buy)
+                total_put_sell += float(put_sell_f if 'put_sell_f' in locals() else put_sell)
             
             # Remove option objects from strike data
             strike_data.pop('call_option', None)
             strike_data.pop('put_option', None)
         
         print(f"[InsightSentry] Estimated total volumes: calls={total_call_vol}, puts={total_put_vol}")
-        
-        # Compute buy/sell heuristic (split observed volume evenly)
-        call_buy = int(total_call_vol / 2)
-        call_sell = int(total_call_vol - call_buy)
-        put_buy = int(total_put_vol / 2)
-        put_sell = int(total_put_vol - put_buy)
+
+        # Prefer per-strike inferred buy/sell totals (from WebSocket inference) when available,
+        # otherwise fall back to a simple 50/50 split as before.
+        if total_call_buy + total_call_sell > 0:
+            call_buy = int(round(total_call_buy))
+            call_sell = int(round(total_call_sell))
+        else:
+            call_buy = int(total_call_vol / 2)
+            call_sell = int(total_call_vol - call_buy)
+
+        if total_put_buy + total_put_sell > 0:
+            put_buy = int(round(total_put_buy))
+            put_sell = int(round(total_put_sell))
+        else:
+            put_buy = int(total_put_vol / 2)
+            put_sell = int(total_put_vol - put_buy)
+
+        # Small bias adjustment based on overall volume imbalance between calls and puts.
+        # This nudges buy/sell away from perfect 50/50 when market shows clear demand.
+        total_volume_sum = total_call_vol + total_put_vol
+        if total_volume_sum > 0:
+            imbalance = (total_call_vol - total_put_vol) / float(total_volume_sum)
+        else:
+            imbalance = 0.0
+
+        # Apply a conservative bias up to ±25% of call/put totals
+        bias_strength = max(-0.25, min(0.25, imbalance * 0.25))
+
+        try:
+            # Increase call_buy if calls dominate, reduce if puts dominate
+            adj = int(round(abs(bias_strength) * total_call_vol))
+            if imbalance > 0:
+                call_buy = max(0, min(total_call_vol, call_buy + adj))
+                call_sell = max(0, total_call_vol - call_buy)
+            elif imbalance < 0:
+                call_buy = max(0, min(total_call_vol, call_buy - adj))
+                call_sell = max(0, total_call_vol - call_buy)
+
+            adj_put = int(round(abs(bias_strength) * total_put_vol))
+            if imbalance < 0:
+                put_buy = max(0, min(total_put_vol, put_buy + adj_put))
+                put_sell = max(0, total_put_vol - put_buy)
+            elif imbalance > 0:
+                put_buy = max(0, min(total_put_vol, put_buy - adj_put))
+                put_sell = max(0, total_put_vol - put_buy)
+        except Exception:
+            pass
+
+        # Compute coverage/confidence: portion of total volume that was covered by real data or WS inference
+        total_volume_all = float(max(1, total_call_vol + total_put_vol))
+        estimation_coverage = (covered_call_vol + covered_put_vol) / total_volume_all
 
         call_ratio = (call_buy / max(call_sell, 1)) if call_sell > 0 else 1.0
         put_ratio = (put_buy / max(put_sell, 1)) if put_sell > 0 else 1.0
@@ -795,6 +1012,7 @@ class InsightSentryProvider(BaseDataProvider):
             'call_ratio': call_ratio,
             'put_ratio': put_ratio,
             'put_call_ratio': put_call_ratio,
+            'estimation_coverage': round(estimation_coverage, 3),
             'strikes': top_strikes,  # Return the top strikes with real volumes
             'raw_options': options,
             'total_options': len(options),
